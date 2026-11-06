@@ -57,6 +57,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedCategoryInitial = MutableStateFlow<String?>(null)
     val selectedCategoryInitial: StateFlow<String?> = _selectedCategoryInitial.asStateFlow()
 
+    private val _currentLanguage = MutableStateFlow(com.example.ui.theme.AppLanguage.ARABIC)
+    val currentLanguage: StateFlow<com.example.ui.theme.AppLanguage> = _currentLanguage.asStateFlow()
+
+    fun setLanguage(language: com.example.ui.theme.AppLanguage) {
+        _currentLanguage.value = language
+    }
+
     fun selectTab(tab: NavTab) {
         _selectedTab.value = tab
         _currentSubScreen.value = AppSubScreen.NONE

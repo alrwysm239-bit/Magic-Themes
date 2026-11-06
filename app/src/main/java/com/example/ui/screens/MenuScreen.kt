@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FolderSpecial
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -54,8 +55,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.ThemeEngineManager
+import com.example.ui.theme.AppLanguage
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.DarkSurface
+import com.example.ui.theme.LocalAppStrings
+import com.example.ui.theme.LocalCurrentLanguage
+import com.example.ui.theme.NeonAmber
 import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonPurple
 import com.example.ui.theme.TextPrimary
@@ -65,10 +70,13 @@ import com.example.ui.theme.TextSecondary
 fun MenuScreen(
     themeEngineManager: ThemeEngineManager,
     onNavigateToMyContent: () -> Unit,
+    onLanguageChanged: (AppLanguage) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    val strings = LocalAppStrings.current
+    val currentLanguage = LocalCurrentLanguage.current
 
     var isDarkModeEnabled by remember { mutableStateOf(true) }
     var isNotificationsEnabled by remember { mutableStateOf(true) }
@@ -92,7 +100,7 @@ fun MenuScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Menu",
+                text = strings.menuTitle,
                 color = TextPrimary,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
@@ -108,7 +116,7 @@ fun MenuScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Search,
-                    contentDescription = "Search",
+                    contentDescription = strings.searchHint,
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
@@ -126,7 +134,7 @@ fun MenuScreen(
                 .background(Color(0xFF141129))
                 .border(1.dp, Color(0x338C52FF), RoundedCornerShape(24.dp))
                 .clickable {
-                    Toast.makeText(context, "Profil Créateur Magic Themes actif", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "حساب المصمم نشط", Toast.LENGTH_SHORT).show()
                 }
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -202,16 +210,16 @@ fun MenuScreen(
         ) {
             MenuItemRow(
                 icon = Icons.Default.FolderSpecial,
-                title = "Mes contenus",
-                subtitle = "Thèmes .hwt, packs d'icônes & favoris",
+                title = strings.myContentTitle,
+                subtitle = strings.myContentSubtitle,
                 iconTint = NeonPurple,
                 onClick = onNavigateToMyContent
             )
 
             MenuItemRow(
                 icon = Icons.Default.Storage,
-                title = "Dossier des thèmes",
-                subtitle = "/Honor/Themes & /Huawei/Themes",
+                title = strings.themeFolderTitle,
+                subtitle = strings.themeFolderSubtitle,
                 iconTint = NeonCyan,
                 onClick = {
                     themeEngineManager.openHonorHuaweiThemeManager()
@@ -244,13 +252,13 @@ fun MenuScreen(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
-                            text = "Notifications thèmes",
+                            text = strings.notificationsTitle,
                             color = TextPrimary,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "Alertes nouveaux thèmes MagicOS",
+                            text = strings.notificationsSubtitle,
                             color = TextSecondary,
                             fontSize = 11.sp
                         )
@@ -268,7 +276,7 @@ fun MenuScreen(
                 )
             }
 
-            // Dark Mode toggle switch (matching screenshot!)
+            // Dark Mode toggle switch
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -294,13 +302,13 @@ fun MenuScreen(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
-                            text = "Dark Mode",
+                            text = strings.darkModeTitle,
                             color = TextPrimary,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "Contraste AMOLED et néons",
+                            text = strings.darkModeSubtitle,
                             color = TextSecondary,
                             fontSize = 11.sp
                         )
@@ -318,18 +326,98 @@ fun MenuScreen(
                 )
             }
 
+            // Language Selector Row (العربية | English | Français)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF221C42)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Language,
+                                contentDescription = null,
+                                tint = NeonCyan,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = strings.languageTitle,
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = currentLanguage.displayName,
+                                color = NeonCyan,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Language selection pills
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AppLanguage.entries.forEach { lang ->
+                        val isSelected = lang == currentLanguage
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    if (isSelected) Brush.horizontalGradient(listOf(NeonPurple, NeonCyan))
+                                    else Brush.horizontalGradient(listOf(Color(0xFF1F1A3B), Color(0xFF1F1A3B)))
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) NeonCyan else Color(0x338C52FF),
+                                    shape = RoundedCornerShape(14.dp)
+                                )
+                                .clickable { onLanguageChanged(lang) }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = lang.displayName,
+                                color = if (isSelected) Color.White else TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+
             MenuItemRow(
                 icon = Icons.AutoMirrored.Filled.HelpOutline,
-                title = "Guide MagicOS / EMUI",
-                subtitle = "Comment installer manuellement un fichier .hwt",
-                iconTint = Color(0xFFFFB800),
+                title = strings.guideTitle,
+                subtitle = strings.guideSubtitle,
+                iconTint = NeonAmber,
                 onClick = { showGuideDialog = true }
             )
         }
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // "Paramètres" button with glowing purple pill outline matching screenshot bottom!
+        // "Paramètres" / "الإعدادات" button with glowing purple pill outline matching screenshot bottom!
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -355,7 +443,7 @@ fun MenuScreen(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Paramètres",
+                    text = strings.btnSettings,
                     color = Color.White,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
@@ -368,14 +456,13 @@ fun MenuScreen(
         AlertDialog(
             onDismissRequest = { showGuideDialog = false },
             title = {
-                Text("Guide d'installation Honor & Huawei (.hwt)", color = TextPrimary, fontWeight = FontWeight.Bold)
+                Text(strings.guideDialogTitle, color = TextPrimary, fontWeight = FontWeight.Bold)
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("1. Téléchargez n'importe quel thème depuis cette application.", color = TextSecondary, fontSize = 13.sp)
-                    Text("2. Le fichier .hwt est automatiquement copié dans le dossier interne Honor/Themes ou Huawei/Themes.", color = TextSecondary, fontSize = 13.sp)
-                    Text("3. Ouvrez l'application officielle Thèmes préinstallée sur votre téléphone.", color = TextSecondary, fontSize = 13.sp)
-                    Text("4. Allez dans l'onglet 'Moi' > 'Mes thèmes', vous y trouverez votre thème prêt à être appliqué !", color = TextSecondary, fontSize = 13.sp)
+                    Text(strings.step1, color = TextSecondary, fontSize = 13.sp)
+                    Text(strings.step2, color = TextSecondary, fontSize = 13.sp)
+                    Text(strings.step3, color = TextSecondary, fontSize = 13.sp)
                 }
             },
             confirmButton = {
@@ -383,12 +470,12 @@ fun MenuScreen(
                     showGuideDialog = false
                     themeEngineManager.openHonorHuaweiThemeManager()
                 }) {
-                    Text("Ouvrir Thèmes Natif", color = NeonCyan, fontWeight = FontWeight.Bold)
+                    Text(strings.btnOpenNativeManager, color = NeonCyan, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showGuideDialog = false }) {
-                    Text("Fermer", color = TextSecondary)
+                    Text(strings.btnClose, color = TextSecondary)
                 }
             },
             containerColor = DarkSurface
@@ -399,14 +486,10 @@ fun MenuScreen(
         AlertDialog(
             onDismissRequest = { showSettingsDialog = false },
             title = {
-                Text("Paramètres Magic Themes", color = TextPrimary, fontWeight = FontWeight.Bold)
+                Text(strings.settingsDialogTitle, color = TextPrimary, fontWeight = FontWeight.Bold)
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Version: 1.0.0 (Honor MagicOS 7/8/9 & EMUI 12/13/14 Edition)", color = TextSecondary, fontSize = 13.sp)
-                    Text("Moteur .HWT: Prise en charge des archives décompressées et chiffrées", color = TextSecondary, fontSize = 13.sp)
-                    Text("Emplacement cible: /Honor/Themes/", color = NeonCyan, fontSize = 12.sp)
-                }
+                Text(strings.settingsDialogText, color = TextSecondary, fontSize = 13.sp)
             },
             confirmButton = {
                 TextButton(onClick = { showSettingsDialog = false }) {

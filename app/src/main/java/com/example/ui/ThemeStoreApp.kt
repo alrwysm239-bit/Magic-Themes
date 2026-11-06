@@ -22,9 +22,17 @@ import com.example.ui.screens.CustomizerScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.IconsScreen
 import com.example.ui.screens.MenuScreen
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
 import com.example.ui.screens.MyContentScreen
 import com.example.ui.screens.ThemeDetailsScreen
 import com.example.ui.screens.WallpapersScreen
+import com.example.ui.theme.ArabicStrings
+import com.example.ui.theme.EnglishStrings
+import com.example.ui.theme.FrenchStrings
+import com.example.ui.theme.LocalAppStrings
+import com.example.ui.theme.LocalCurrentLanguage
+import com.example.ui.theme.AppLanguage
 import com.example.ui.theme.DarkBackground
 
 @Composable
@@ -41,24 +49,36 @@ fun ThemeStoreApp(
     val customizerState by viewModel.customizerState.collectAsStateWithLifecycle()
     val selectedTheme by viewModel.selectedTheme.collectAsStateWithLifecycle()
     val selectedCategoryInitial by viewModel.selectedCategoryInitial.collectAsStateWithLifecycle()
+    val currentLanguage by viewModel.currentLanguage.collectAsStateWithLifecycle()
 
-    Scaffold(
-        modifier = modifier
-            .fillMaxSize()
-            .background(DarkBackground),
-        containerColor = DarkBackground,
-        content = { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                // Main Content Switching
-                AnimatedContent(
-                    targetState = currentSubScreen,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = "screenTransition"
-                ) { subScreen ->
+    val currentStrings = when (currentLanguage) {
+        AppLanguage.ARABIC -> ArabicStrings
+        AppLanguage.ENGLISH -> EnglishStrings
+        AppLanguage.FRENCH -> FrenchStrings
+    }
+
+    CompositionLocalProvider(
+        LocalLayoutDirection provides currentLanguage.direction,
+        LocalAppStrings provides currentStrings,
+        LocalCurrentLanguage provides currentLanguage
+    ) {
+        Scaffold(
+            modifier = modifier
+                .fillMaxSize()
+                .background(DarkBackground),
+            containerColor = DarkBackground,
+            content = { innerPadding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
+                    // Main Content Switching
+                    AnimatedContent(
+                        targetState = currentSubScreen,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "screenTransition"
+                    ) { subScreen ->
                     when (subScreen) {
                         AppSubScreen.THEME_DETAILS -> {
                             selectedTheme?.let { theme ->
@@ -151,7 +171,8 @@ fun ThemeStoreApp(
                                     NavTab.MENU -> {
                                         MenuScreen(
                                             themeEngineManager = viewModel.themeEngineManager,
-                                            onNavigateToMyContent = { viewModel.openMyContent() }
+                                            onNavigateToMyContent = { viewModel.openMyContent() },
+                                            onLanguageChanged = { viewModel.setLanguage(it) }
                                         )
                                     }
                                 }
@@ -171,4 +192,5 @@ fun ThemeStoreApp(
             }
         }
     )
+    }
 }

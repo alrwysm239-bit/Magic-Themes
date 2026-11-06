@@ -78,6 +78,8 @@ import com.example.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 import java.io.File
 
+import com.example.ui.theme.LocalAppStrings
+
 @Composable
 fun CustomizerScreen(
     customizerState: CustomizerState,
@@ -89,6 +91,7 @@ fun CustomizerScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val strings = LocalAppStrings.current
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
@@ -132,7 +135,7 @@ fun CustomizerScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Customizer Studio",
+                text = strings.customizerTitle,
                 color = TextPrimary,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
@@ -148,7 +151,7 @@ fun CustomizerScreen(
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Text(
-                    text = if (customizerState.previewMode == PreviewMode.HOME_SCREEN) "Écran d'accueil" else "Verrouillage",
+                    text = if (customizerState.previewMode == PreviewMode.HOME_SCREEN) strings.screenHome else strings.screenLock,
                     color = NeonCyan,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
@@ -204,25 +207,25 @@ fun CustomizerScreen(
         ) {
             ToolTabButton(
                 icon = Icons.Default.ColorLens,
-                label = "Couleur",
+                label = strings.toolColor,
                 isSelected = activeToolTab == 0,
                 onClick = { activeToolTab = 0 }
             )
             ToolTabButton(
                 icon = Icons.Default.Brush,
-                label = "Fond",
+                label = strings.toolWallpaper,
                 isSelected = activeToolTab == 1,
                 onClick = { activeToolTab = 1 }
             )
             ToolTabButton(
                 icon = Icons.Default.Schedule,
-                label = "Horloge",
+                label = strings.toolClock,
                 isSelected = activeToolTab == 2,
                 onClick = { activeToolTab = 2 }
             )
             ToolTabButton(
                 icon = Icons.Default.Dashboard,
-                label = "Icônes",
+                label = strings.toolIcons,
                 isSelected = activeToolTab == 3,
                 onClick = { activeToolTab = 3 }
             )
@@ -235,7 +238,7 @@ fun CustomizerScreen(
             0 -> {
                 // Color swatches row
                 Text(
-                    text = "Teinte néon d'accentuation",
+                    text = strings.accentColorHint,
                     color = TextSecondary,
                     fontSize = 12.sp
                 )
@@ -363,7 +366,7 @@ fun CustomizerScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             NeonGradientButton(
-                text = if (isExporting) "Génération..." else "Exporter Pack .hwt",
+                text = if (isExporting) strings.exportingHwt else strings.exportHwt,
                 icon = Icons.Default.AutoAwesome,
                 isLoading = isExporting,
                 onClick = {

@@ -62,6 +62,8 @@ import com.example.ui.theme.NeonPurple
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
+import com.example.ui.theme.LocalAppStrings
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IconsScreen(
@@ -69,10 +71,15 @@ fun IconsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var selectedFilter by remember { mutableStateOf("Icon Packs") }
+    val strings = LocalAppStrings.current
+    var selectedFilterKey by remember { mutableStateOf("Icon Packs") }
     var selectedPackForDetails by remember { mutableStateOf<IconPackItem?>(null) }
 
-    val filterOptions = listOf("Icon Packs", "Icons", "Minimal")
+    val filterOptions = listOf(
+        "Icon Packs" to strings.iconPacks,
+        "Icons" to strings.iconsSimple,
+        "Minimal" to strings.minimal
+    )
 
     Column(
         modifier = modifier
@@ -89,7 +96,7 @@ fun IconsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Icons",
+                text = strings.iconsTitle,
                 color = TextPrimary,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
@@ -105,7 +112,7 @@ fun IconsScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Search,
-                    contentDescription = "Search Icon Packs",
+                    contentDescription = strings.searchHint,
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
@@ -119,11 +126,11 @@ fun IconsScreen(
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            filterOptions.forEach { filter ->
-                val isSelected = filter == selectedFilter
+            filterOptions.forEach { (key, label) ->
+                val isSelected = key == selectedFilterKey
                 Box(
                     modifier = Modifier
-                        .testTag("icon_filter_${filter.lowercase().replace(" ", "_")}")
+                        .testTag("icon_filter_${key.lowercase().replace(" ", "_")}")
                         .clip(RoundedCornerShape(20.dp))
                         .then(
                             if (isSelected) {
@@ -132,12 +139,12 @@ fun IconsScreen(
                                 Modifier.background(Color(0x1F2B244D)).border(1.dp, Color(0x228C52FF), RoundedCornerShape(20.dp))
                             }
                         )
-                        .clickable { selectedFilter = filter }
+                        .clickable { selectedFilterKey = key }
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = filter,
+                        text = label,
                         color = if (isSelected) Color.White else TextSecondary,
                         fontSize = 12.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
@@ -219,7 +226,7 @@ fun IconsScreen(
                 }
 
                 NeonGradientButton(
-                    text = "Télécharger le pack d'icônes",
+                    text = strings.btnDownloadIconPack,
                     onClick = {
                         Toast.makeText(context, "Pack ${pack.title} prêt dans /Honor/Themes/icons", Toast.LENGTH_SHORT).show()
                         selectedPackForDetails = null

@@ -58,6 +58,8 @@ import com.example.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 import java.io.File
 
+import com.example.ui.theme.LocalAppStrings
+
 @Composable
 fun MyContentScreen(
     themes: List<ThemeItem>,
@@ -69,12 +71,13 @@ fun MyContentScreen(
     BackHandler { onBackClick() }
 
     val coroutineScope = rememberCoroutineScope()
-    var selectedFilter by remember { mutableStateOf("Téléchargés") }
+    val strings = LocalAppStrings.current
+    var selectedFilterKey by remember { mutableStateOf("downloaded") }
     var selectedThemeForDialog by remember { mutableStateOf<ThemeItem?>(null) }
     var readyHwtFile by remember { mutableStateOf<File?>(null) }
 
-    val contentList = remember(themes, selectedFilter) {
-        if (selectedFilter == "Téléchargés") {
+    val contentList = remember(themes, selectedFilterKey) {
+        if (selectedFilterKey == "downloaded") {
             themes.filter { it.isDownloaded }
                 .ifEmpty { listOf(themes.first()) }
         } else {
@@ -101,12 +104,12 @@ fun MyContentScreen(
                 IconButton(onClick = onBackClick) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour",
+                        contentDescription = strings.btnClose,
                         tint = TextPrimary
                     )
                 }
                 Text(
-                    text = "Mes Contenus",
+                    text = strings.myContentTitle,
                     color = TextPrimary,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
@@ -122,14 +125,14 @@ fun MyContentScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Search,
-                    contentDescription = "Recherche",
+                    contentDescription = strings.searchHint,
                     tint = Color.White,
                     modifier = Modifier.size(18.dp)
                 )
             }
         }
 
-        // Filter Pills: [ Téléchargés ] [ Favoris ]
+        // Filter Pills: [ المحملة ] [ المفضلة ]
         Row(
             modifier = Modifier
                 .padding(horizontal = 20.dp, vertical = 8.dp)
@@ -138,11 +141,15 @@ fun MyContentScreen(
                 .border(1.dp, Color(0x338C52FF), RoundedCornerShape(24.dp))
                 .padding(4.dp)
         ) {
-            listOf("Téléchargés", "Favoris").forEach { filter ->
-                val isSelected = filter == selectedFilter
+            val filterOptions = listOf(
+                "downloaded" to strings.tabDownloaded,
+                "favorites" to strings.tabFavorites
+            )
+            filterOptions.forEach { (key, label) ->
+                val isSelected = key == selectedFilterKey
                 Box(
                     modifier = Modifier
-                        .testTag("filter_content_${filter.lowercase()}")
+                        .testTag("filter_content_$key")
                         .clip(RoundedCornerShape(20.dp))
                         .then(
                             if (isSelected) {
@@ -151,11 +158,11 @@ fun MyContentScreen(
                                 Modifier.background(Color.Transparent)
                             }
                         )
-                        .clickable { selectedFilter = filter }
+                        .clickable { selectedFilterKey = key }
                         .padding(horizontal = 20.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = filter,
+                        text = label,
                         color = if (isSelected) Color.White else TextSecondary,
                         fontSize = 12.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium

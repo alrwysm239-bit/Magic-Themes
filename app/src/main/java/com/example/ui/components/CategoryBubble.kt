@@ -49,16 +49,19 @@ data class QuickBubbleData(
     val testTag: String
 )
 
+import com.example.ui.theme.LocalAppStrings
+
 @Composable
 fun QuickCategoryBubblesRow(
     onBubbleClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     val bubbles = listOf(
-        QuickBubbleData("my_content", "Mes\ncontenus", Icons.Default.FolderSpecial, NeonMagenta, "bubble_my_content"),
-        QuickBubbleData("noir", "Noir", Icons.Default.Brightness2, NeonCyan, "bubble_noir"),
-        QuickBubbleData("video", "Vidéo", Icons.Default.PlayCircleFilled, NeonPurple, "bubble_video"),
-        QuickBubbleData("best", "Meilleur", Icons.Default.EmojiEvents, NeonAmber, "bubble_best")
+        QuickBubbleData("my_content", strings.bubbleMyContent, Icons.Default.FolderSpecial, NeonMagenta, "bubble_my_content"),
+        QuickBubbleData("noir", strings.bubbleDark, Icons.Default.Brightness2, NeonCyan, "bubble_noir"),
+        QuickBubbleData("video", strings.bubbleVideo, Icons.Default.PlayCircleFilled, NeonPurple, "bubble_video"),
+        QuickBubbleData("best", strings.bubbleBest, Icons.Default.EmojiEvents, NeonAmber, "bubble_best")
     )
 
     Row(

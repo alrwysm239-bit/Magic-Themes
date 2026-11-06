@@ -42,20 +42,25 @@ import com.example.ui.theme.NeonPurpleCyanBrush
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
-enum class HeaderFilter(val label: String) {
-    FEATURED("Featured"),
-    TOP("Top")
+import com.example.ui.theme.LocalAppStrings
+
+enum class HeaderFilter {
+    FEATURED,
+    TOP
 }
 
 @Composable
 fun TopHeaderBar(
-    title: String = "Magic Themes",
-    subtitle: String = "Honor & Huawei EMUI",
+    title: String? = null,
+    subtitle: String? = null,
     selectedFilter: HeaderFilter,
     onFilterSelected: (HeaderFilter) -> Unit,
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
+    val displayTitle = title ?: strings.appTitle
+    val displaySubtitle = subtitle ?: strings.appSubtitle
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -70,14 +75,14 @@ fun TopHeaderBar(
         ) {
             Column {
                 Text(
-                    text = title,
+                    text = displayTitle,
                     color = TextPrimary,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp
                 )
                 Text(
-                    text = subtitle,
+                    text = displaySubtitle,
                     color = NeonCyan.copy(alpha = 0.8f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
@@ -121,7 +126,7 @@ fun TopHeaderBar(
             ) {
                 Icon(
                     imageVector = Icons.Default.Search,
-                    contentDescription = "Recherche de thèmes",
+                    contentDescription = strings.searchHint,
                     tint = Color.White,
                     modifier = Modifier.size(24.dp)
                 )
@@ -130,7 +135,7 @@ fun TopHeaderBar(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Filter Pills: [ Featured ] [ Top ]
+        // Filter Pills: [ Featured / المميزة ] [ Top / الأفضل ]
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(24.dp))
@@ -141,6 +146,10 @@ fun TopHeaderBar(
         ) {
             HeaderFilter.entries.forEach { filter ->
                 val isSelected = filter == selectedFilter
+                val filterLabel = when (filter) {
+                    HeaderFilter.FEATURED -> strings.filterFeatured
+                    HeaderFilter.TOP -> strings.filterTop
+                }
 
                 Box(
                     modifier = Modifier
@@ -165,7 +174,7 @@ fun TopHeaderBar(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = filter.label,
+                        text = filterLabel,
                         color = if (isSelected) Color.White else TextSecondary,
                         fontSize = 13.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium

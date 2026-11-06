@@ -68,6 +68,8 @@ import com.example.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 import java.io.File
 
+import com.example.ui.theme.LocalAppStrings
+
 @Composable
 fun ThemeDetailsScreen(
     theme: ThemeItem,
@@ -80,6 +82,7 @@ fun ThemeDetailsScreen(
     BackHandler { onBackClick() }
 
     val context = LocalContext.current
+    val strings = LocalAppStrings.current
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
@@ -108,13 +111,13 @@ fun ThemeDetailsScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour",
+                        contentDescription = strings.btnClose,
                         tint = TextPrimary
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Détails du thème",
+                    text = strings.themeDetailsTitle,
                     color = TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
@@ -130,7 +133,7 @@ fun ThemeDetailsScreen(
                 }) {
                     Icon(
                         imageVector = Icons.Default.Share,
-                        contentDescription = "Partager",
+                        contentDescription = strings.shareLabel,
                         tint = TextPrimary
                     )
                 }
@@ -256,17 +259,17 @@ fun ThemeDetailsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Spécifications du thème",
+                    text = strings.specifications,
                     color = TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
 
-                SpecRow(label = "Format", value = ".HWT (Huawei/Honor Archive)")
-                SpecRow(label = "Compatibilité", value = theme.compatibleVersions)
-                SpecRow(label = "Taille de l'archive", value = theme.sizeMb)
-                SpecRow(label = "Contenu", value = "Écran de verrouillage, Icônes 3D, Widgets, Fond QHD+")
-                SpecRow(label = "Prix", value = theme.price)
+                SpecRow(label = strings.formatLabel, value = ".HWT (Huawei/Honor Archive)")
+                SpecRow(label = strings.compatibilityLabel, value = theme.compatibleVersions)
+                SpecRow(label = strings.sizeLabel, value = theme.sizeMb)
+                SpecRow(label = strings.contentLabel, value = "Écran de verrouillage, Icônes 3D, Widgets, Fond QHD+")
+                SpecRow(label = strings.priceLabel, value = theme.price)
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -281,7 +284,7 @@ fun ThemeDetailsScreen(
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "Description",
+                    text = strings.descriptionLabel,
                     color = TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
@@ -298,7 +301,7 @@ fun ThemeDetailsScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Bottom Action Bar matching image: Big glowing "Télécharger" + Favorite Heart
+        // Bottom Action Bar: Big glowing "Télécharger" / "تحميل (.hwt)" + Favorite Heart
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -310,7 +313,7 @@ fun ThemeDetailsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             NeonGradientButton(
-                text = if (theme.isDownloaded) "Appliquer (.hwt)" else "Télécharger",
+                text = if (theme.isDownloaded) strings.btnApply else strings.btnDownload,
                 icon = if (theme.isDownloaded) Icons.Default.FileDownload else Icons.Default.Download,
                 isLoading = isDownloading,
                 onClick = {

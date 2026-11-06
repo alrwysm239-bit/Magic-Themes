@@ -62,6 +62,8 @@ import com.example.ui.theme.NeonPurple
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
+import com.example.ui.theme.LocalAppStrings
+
 @Composable
 fun HomeScreen(
     themes: List<ThemeItem>,
@@ -71,6 +73,7 @@ fun HomeScreen(
     onQuickBubbleClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     var selectedFilter by remember { mutableStateOf(HeaderFilter.FEATURED) }
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -93,8 +96,8 @@ fun HomeScreen(
         // Top Header Bar
         item {
             TopHeaderBar(
-                title = "Magic Themes",
-                subtitle = "Honor & Huawei EMUI",
+                title = strings.appTitle,
+                subtitle = strings.appSubtitle,
                 selectedFilter = selectedFilter,
                 onFilterSelected = { selectedFilter = it },
                 onSearchClick = { isSearchActive = !isSearchActive }
@@ -115,7 +118,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("search_input_field"),
-                        placeholder = { Text("Rechercher un thème, créateur...", color = TextSecondary) },
+                        placeholder = { Text(strings.searchHint, color = TextSecondary) },
                         leadingIcon = {
                             Icon(Icons.Default.Search, contentDescription = null, tint = NeonCyan)
                         },
@@ -148,10 +151,10 @@ fun HomeScreen(
             )
         }
 
-        // Section: "Thèmes toujours populaires" (Trending/Popular)
+        // Section: "الثيمات الأكثر شعبية" / Popular Themes
         item {
             SectionHeader(
-                title = "Thèmes toujours populaires",
+                title = strings.sectionPopular,
                 onSeeAllClick = { onCategoryClick("popular") }
             )
         }
@@ -170,7 +173,7 @@ fun HomeScreen(
             }
         }
 
-        // Promotional Banner Carousel: "Les thèmes que tout le monde essaie"
+        // Promotional Banner Carousel: "الثيمات التي يجربها الجميع" / "Themes Everyone is Trying"
         item {
             Spacer(modifier = Modifier.height(24.dp))
             PromoBanner(
@@ -181,11 +184,11 @@ fun HomeScreen(
             )
         }
 
-        // Section: "Thèmes choisis par l'éditeur" (Editor's Choice)
+        // Section: "اختيارات المحرر" / Editor's Choice
         item {
             Spacer(modifier = Modifier.height(20.dp))
             SectionHeader(
-                title = "Thèmes choisis par l'éditeur",
+                title = strings.sectionEditorsChoice,
                 onSeeAllClick = { onCategoryClick("editors_choice") }
             )
         }
@@ -209,7 +212,7 @@ fun HomeScreen(
         item {
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Explorer par Catégories",
+                text = strings.exploreCategories,
                 color = TextPrimary,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
@@ -269,6 +272,7 @@ fun ThemePreviewCard(
     modifier: Modifier = Modifier
 ) {
     val cardShape = RoundedCornerShape(20.dp)
+    val strings = LocalAppStrings.current
 
     Column(
         modifier = modifier
@@ -326,7 +330,7 @@ fun ThemePreviewCard(
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "Animated",
+                        text = strings.animatedBadge,
                         color = NeonCyan,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
@@ -352,9 +356,12 @@ fun ThemePreviewCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val isFree = theme.price.equals("Gratuit", ignoreCase = true) || 
+                         theme.price.equals("Free", ignoreCase = true) ||
+                         theme.price.equals("مجاني", ignoreCase = true)
             Text(
-                text = theme.price,
-                color = if (theme.price == "Gratuit") NeonCyan else TextSecondary,
+                text = if (isFree) strings.freePrice else theme.price,
+                color = if (isFree) NeonCyan else TextSecondary,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -383,6 +390,7 @@ fun PromoBanner(
     modifier: Modifier = Modifier
 ) {
     val bannerShape = RoundedCornerShape(24.dp)
+    val strings = LocalAppStrings.current
 
     Box(
         modifier = modifier
@@ -422,7 +430,7 @@ fun PromoBanner(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Les thèmes que\ntout le monde essaie",
+                    text = strings.bannerHeadline,
                     color = Color(0xFF1E103A),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -430,7 +438,7 @@ fun PromoBanner(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Ne tardez pas, achetez dès aujourd'hui",
+                    text = strings.bannerSub,
                     color = Color(0xFF4A346E),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium

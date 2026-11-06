@@ -149,8 +149,17 @@ fun BottomNavBar(
                         )
                     }
 
+                    val strings = com.example.ui.theme.LocalAppStrings.current
+                    val tabTitle = when (tab) {
+                        NavTab.THEMES -> strings.tabThemes
+                        NavTab.WALLPAPERS -> strings.tabWallpapers
+                        NavTab.ICONS -> strings.tabIcons
+                        NavTab.CUSTOMIZER -> strings.tabCustomizer
+                        NavTab.MENU -> strings.tabMenu
+                    }
+
                     Text(
-                        text = tab.title,
+                        text = tabTitle,
                         color = textColor,
                         fontSize = 10.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,

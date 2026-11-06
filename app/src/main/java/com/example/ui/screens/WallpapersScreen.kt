@@ -71,6 +71,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+import com.example.ui.theme.LocalAppStrings
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WallpapersScreen(
@@ -79,15 +81,20 @@ fun WallpapersScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val strings = LocalAppStrings.current
     val coroutineScope = rememberCoroutineScope()
-    var selectedFilter by remember { mutableStateOf("Live Wallpapers") }
+    var selectedFilterKey by remember { mutableStateOf("Live Wallpapers") }
     var selectedWallpaperForPreview by remember { mutableStateOf<WallpaperItem?>(null) }
     var isApplying by remember { mutableStateOf(false) }
 
-    val filterOptions = listOf("Live Wallpapers", "Wallpapers", "Art/Design")
+    val filterOptions = listOf(
+        "Live Wallpapers" to strings.liveWallpapers,
+        "Wallpapers" to strings.allWallpapers,
+        "Art/Design" to strings.artDesign
+    )
 
-    val filteredList = remember(wallpapers, selectedFilter) {
-        wallpapers.filter { it.category == selectedFilter }
+    val filteredList = remember(wallpapers, selectedFilterKey) {
+        wallpapers.filter { it.category == selectedFilterKey }
     }
 
     Column(
@@ -105,7 +112,7 @@ fun WallpapersScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Wallpapers",
+                text = strings.wallpapersTitle,
                 color = TextPrimary,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
@@ -121,7 +128,7 @@ fun WallpapersScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Search,
-                    contentDescription = "Search Wallpapers",
+                    contentDescription = strings.searchHint,
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
@@ -135,12 +142,12 @@ fun WallpapersScreen(
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            filterOptions.forEach { filter ->
-                val isSelected = filter == selectedFilter
+            filterOptions.forEach { (key, label) ->
+                val isSelected = key == selectedFilterKey
 
                 Box(
                     modifier = Modifier
-                        .testTag("wallpaper_filter_${filter.lowercase().replace(" ", "_")}")
+                        .testTag("wallpaper_filter_${key.lowercase().replace(" ", "_")}")
                         .clip(RoundedCornerShape(20.dp))
                         .then(
                             if (isSelected) {
@@ -149,12 +156,12 @@ fun WallpapersScreen(
                                 Modifier.background(Color(0x1F2B244D)).border(1.dp, Color(0x228C52FF), RoundedCornerShape(20.dp))
                             }
                         )
-                        .clickable { selectedFilter = filter }
+                        .clickable { selectedFilterKey = key }
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = filter,
+                        text = label,
                         color = if (isSelected) Color.White else TextSecondary,
                         fontSize = 12.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
@@ -234,7 +241,7 @@ fun WallpapersScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     NeonGradientButton(
-                        text = if (isApplying) "Application..." else "Appliquer Fond d'écran",
+                        text = if (isApplying) strings.applyingWallpaper else strings.applyWallpaper,
                         icon = Icons.Default.Wallpaper,
                         isLoading = isApplying,
                         onClick = {
@@ -250,7 +257,7 @@ fun WallpapersScreen(
                                     } catch (_: Exception) {}
                                 }
                                 isApplying = false
-                                Toast.makeText(context, "Fond d'écran appliqué avec succès !", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, strings.wallpaperAppliedSuccess, Toast.LENGTH_SHORT).show()
                                 selectedWallpaperForPreview = null
                             }
                         },
