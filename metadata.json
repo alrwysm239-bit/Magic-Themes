@@ -1,0 +1,8 @@
+{
+  "name": "Magic Themes",
+  "description": "Futuristic neon theme store for Honor and Huawei EMUI and MagicOS devices with .hwt downloads and customization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">Magic Themes</string>
+    <string name="tab_themes">Thèmes</string>
+    <string name="tab_wallpapers">Wallpapers</string>
+    <string name="tab_icons">Icons</string>
+    <string name="tab_customizer">Customizer</string>
+    <string name="tab_menu">Menu</string>
+    <string name="filter_featured">Featured</string>
+    <string name="filter_top">Top</string>
+    <string name="cat_my_content">Mes contenus</string>
+    <string name="cat_dark">Noir</string>
+    <string name="cat_video">Vidéo</string>
+    <string name="cat_best">Meilleur</string>
+    <string name="section_trending">Thèmes toujours populaires</string>
+    <string name="section_editors_choice">Thèmes choisis par l\'éditeur</string>
+    <string name="banner_headline">Les thèmes que tout le monde essaie</string>
+    <string name="banner_sub">Ne tardez pas, achetez dès aujourd\'hui</string>
+    <string name="action_download">Télécharger</string>
+    <string name="action_apply">Appliquer</string>
+    <string name="action_update">Mettre à jour</string>
+</resources>
