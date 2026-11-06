@@ -55,6 +55,8 @@ import com.example.ui.theme.NeonPurple
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
+import com.example.ui.theme.LocalAppStrings
+
 @Composable
 fun CategoriesScreen(
     categories: List<CategoryItem>,
@@ -64,6 +66,7 @@ fun CategoriesScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     var selectedCategory by remember { mutableStateOf(selectedCategoryInitial) }
 
     BackHandler {
@@ -94,14 +97,14 @@ fun CategoriesScreen(
                 }) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour",
+                        contentDescription = strings.btnClose,
                         tint = TextPrimary
                     )
                 }
                 Text(
                     text = if (selectedCategory != null) {
-                        categories.firstOrNull { it.id == selectedCategory }?.title ?: "Thèmes"
-                    } else "Categories",
+                        categories.firstOrNull { it.id == selectedCategory }?.title ?: strings.tabThemes
+                    } else strings.exploreCategories,
                     color = TextPrimary,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold

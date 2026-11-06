@@ -44,6 +44,8 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import java.io.File
 
+import com.example.ui.theme.LocalAppStrings
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HwtApplyDialog(
@@ -53,6 +55,8 @@ fun HwtApplyDialog(
     onShareHwt: (File) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = LocalAppStrings.current
+
     BasicAlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.padding(16.dp)
@@ -93,14 +97,14 @@ fun HwtApplyDialog(
                 }
 
                 Text(
-                    text = "Thème Prêt (.hwt)",
+                    text = strings.dialogReadyTitle,
                     color = TextPrimary,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
 
                 Text(
-                    text = "Le fichier $themeTitle est enregistré avec succès pour MagicOS & EMUI.",
+                    text = "$themeTitle: ${strings.dialogReadyDesc}",
                     color = TextSecondary,
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
@@ -119,15 +123,15 @@ fun HwtApplyDialog(
                 ) {
                     InstructionStep(
                         step = "1",
-                        text = "Fichier exporté dans /Honor/Themes ou /Huawei/Themes"
+                        text = strings.step1
                     )
                     InstructionStep(
                         step = "2",
-                        text = "Ouvrez l'application native 'Thèmes' sur votre appareil"
+                        text = strings.step2
                     )
                     InstructionStep(
                         step = "3",
-                        text = "Allez dans l'onglet 'Moi' > 'Mes thèmes' et appliquez"
+                        text = strings.step3
                     )
                 }
 
@@ -137,7 +141,7 @@ fun HwtApplyDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     NeonGradientButton(
-                        text = "Ouvrir Thèmes Natif",
+                        text = strings.btnOpenNativeManager,
                         icon = Icons.Default.Launch,
                         onClick = onOpenThemeManager,
                         modifier = Modifier.fillMaxWidth(),
@@ -164,7 +168,7 @@ fun HwtApplyDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Partager / Envoyer le fichier .hwt",
+                                text = strings.btnShareHwt,
                                 color = TextPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -177,7 +181,7 @@ fun HwtApplyDialog(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Fermer",
+                            text = strings.btnClose,
                             color = TextSecondary,
                             fontSize = 14.sp
                         )

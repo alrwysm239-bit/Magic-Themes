@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.NeonAmber
 import com.example.ui.theme.NeonCyan
+import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.NeonMagenta
 import com.example.ui.theme.NeonPurple
 import com.example.ui.theme.TextPrimary
@@ -48,8 +49,6 @@ data class QuickBubbleData(
     val glowColor: Color,
     val testTag: String
 )
-
-import com.example.ui.theme.LocalAppStrings
 
 @Composable
 fun QuickCategoryBubblesRow(

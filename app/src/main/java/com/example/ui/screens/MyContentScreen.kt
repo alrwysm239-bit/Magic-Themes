@@ -289,7 +289,9 @@ fun InstalledThemeCard(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Dual Action buttons matching screenshot: [ Mettre à jour ] [ Appliquer ]
+        val strings = LocalAppStrings.current
+
+        // Dual Action buttons: [ تحديث / Update ] [ تطبيق / Apply ]
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -306,7 +308,7 @@ fun InstalledThemeCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Mise à jour",
+                    text = strings.btnUpdate,
                     color = Color.White,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Medium
@@ -324,7 +326,7 @@ fun InstalledThemeCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Appliquer",
+                    text = strings.btnApply,
                     color = Color.White,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold
