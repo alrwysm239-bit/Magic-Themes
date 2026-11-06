@@ -96,13 +96,15 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 4. Create is_admin() Function
+-- 4. Create is_admin() Function (Dual Check: user_roles table OR email whitelist)
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.user_roles
     WHERE user_id = auth.uid() AND role = 'admin'
+  ) OR (
+    SELECT (auth.jwt() ->> 'email') IN ('zaim9002@gmail.com', 'ogames226@gmail.com', 'alrwysm239@gmail.com')
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
