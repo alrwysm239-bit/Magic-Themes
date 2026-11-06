@@ -123,7 +123,7 @@ fun CustomizerScreen(
             .background(DarkBackground)
             .statusBarsPadding()
             .verticalScroll(scrollState)
-            .padding(bottom = 120.dp),
+            .padding(bottom = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Top Header
@@ -159,12 +159,12 @@ fun CustomizerScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // Center Phone Mockup with Glowing Radial Aura behind it (Matching image!)
+        // Center Phone Mockup with Glowing Radial Aura behind it (Sleek fit)
         Box(
             modifier = Modifier
-                .size(width = 240.dp, height = 370.dp)
+                .size(width = 200.dp, height = 300.dp)
                 .drawBehind {
                     // Glowing circular spectrum ring behind phone
                     drawCircle(
@@ -177,8 +177,8 @@ fun CustomizerScreen(
                                 Color(customizerState.accentColorLong)
                             )
                         ),
-                        radius = size.width * 0.6f,
-                        style = Stroke(width = 8.dp.toPx())
+                        radius = size.width * 0.58f,
+                        style = Stroke(width = 6.dp.toPx())
                     )
                 },
             contentAlignment = Alignment.Center
@@ -193,45 +193,51 @@ fun CustomizerScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Customizer Tool selector bar (Wallpaper, Color, Clock Widget, Font)
+        // Customizer Tool selector bar with equal-weighted tabs (Color, Wallpaper, Clock, Icons)
         Row(
             modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp)
                 .clip(RoundedCornerShape(24.dp))
                 .background(Color(0xFF141129))
                 .border(1.dp, Color(0x338C52FF), RoundedCornerShape(24.dp))
                 .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ToolTabButton(
                 icon = Icons.Default.ColorLens,
                 label = strings.toolColor,
                 isSelected = activeToolTab == 0,
-                onClick = { activeToolTab = 0 }
+                onClick = { activeToolTab = 0 },
+                modifier = Modifier.weight(1f)
             )
             ToolTabButton(
                 icon = Icons.Default.Brush,
                 label = strings.toolWallpaper,
                 isSelected = activeToolTab == 1,
-                onClick = { activeToolTab = 1 }
+                onClick = { activeToolTab = 1 },
+                modifier = Modifier.weight(1f)
             )
             ToolTabButton(
                 icon = Icons.Default.Schedule,
                 label = strings.toolClock,
                 isSelected = activeToolTab == 2,
-                onClick = { activeToolTab = 2 }
+                onClick = { activeToolTab = 2 },
+                modifier = Modifier.weight(1f)
             )
             ToolTabButton(
                 icon = Icons.Default.Dashboard,
                 label = strings.toolIcons,
                 isSelected = activeToolTab == 3,
-                onClick = { activeToolTab = 3 }
+                onClick = { activeToolTab = 3 },
+                modifier = Modifier.weight(1f)
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Tab Content
         when (activeToolTab) {
@@ -407,14 +413,15 @@ private fun ToolTabButton(
     icon: ImageVector,
     label: String,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(20.dp))
             .background(if (isSelected) NeonPurple else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 6.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(

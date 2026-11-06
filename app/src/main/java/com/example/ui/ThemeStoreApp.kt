@@ -67,6 +67,14 @@ fun ThemeStoreApp(
                 .fillMaxSize()
                 .background(DarkBackground),
             containerColor = DarkBackground,
+            bottomBar = {
+                if (currentSubScreen == AppSubScreen.NONE) {
+                    BottomNavBar(
+                        selectedTab = selectedTab,
+                        onTabSelected = { viewModel.selectTab(it) }
+                    )
+                }
+            },
             content = { innerPadding ->
                 Box(
                     modifier = Modifier
@@ -179,15 +187,6 @@ fun ThemeStoreApp(
                             }
                         }
                     }
-                }
-
-                // Show floating Bottom Navigation Bar whenever on primary tabs
-                if (currentSubScreen == AppSubScreen.NONE) {
-                    BottomNavBar(
-                        selectedTab = selectedTab,
-                        onTabSelected = { viewModel.selectTab(it) },
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    )
                 }
             }
         }

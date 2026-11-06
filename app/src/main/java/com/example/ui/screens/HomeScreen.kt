@@ -91,7 +91,7 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
             .background(DarkBackground),
-        contentPadding = PaddingValues(bottom = 110.dp)
+        contentPadding = PaddingValues(bottom = 20.dp)
     ) {
         // Top Header Bar
         item {

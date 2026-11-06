@@ -134,16 +134,66 @@ CREATE POLICY "Admins can insert themes" ON public.themes FOR INSERT WITH CHECK 
 CREATE POLICY "Admins can update themes" ON public.themes FOR UPDATE USING (public.is_admin());
 CREATE POLICY "Admins can delete themes" ON public.themes FOR DELETE USING (public.is_admin());
 
--- 7. Supabase Storage Buckets
+-- 7. Create Wallpapers Table
+CREATE TABLE IF NOT EXISTS public.wallpapers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(150) NOT NULL,
+    category VARCHAR(50) DEFAULT 'Static' CHECK (category IN ('Static', 'Live Wallpapers', 'Wallpapers', 'Art/Design')),
+    resolution VARCHAR(50) DEFAULT '1440 x 3200 (QHD+)',
+    image_url TEXT NOT NULL,
+    tags TEXT[] DEFAULT ARRAY['AMOLED', 'Neon'],
+    downloads_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 8. Create Icons Table
+CREATE TABLE IF NOT EXISTS public.icons (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(150) NOT NULL,
+    developer VARCHAR(100) DEFAULT 'Magic Studio',
+    category VARCHAR(50) DEFAULT 'Minimal',
+    rating NUMERIC(2, 1) DEFAULT 4.9,
+    icons_count INTEGER DEFAULT 1600,
+    preview_url TEXT NOT NULL,
+    package_file_url TEXT NOT NULL,
+    compatible_versions VARCHAR(100) DEFAULT 'MagicOS & EMUI',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- RLS & Policies for Wallpapers and Icons
+ALTER TABLE public.wallpapers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.icons ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public can view wallpapers" ON public.wallpapers FOR SELECT USING (true);
+CREATE POLICY "Admins can insert wallpapers" ON public.wallpapers FOR INSERT WITH CHECK (public.is_admin());
+CREATE POLICY "Admins can update wallpapers" ON public.wallpapers FOR UPDATE USING (public.is_admin());
+CREATE POLICY "Admins can delete wallpapers" ON public.wallpapers FOR DELETE USING (public.is_admin());
+
+CREATE POLICY "Public can view icons" ON public.icons FOR SELECT USING (true);
+CREATE POLICY "Admins can insert icons" ON public.icons FOR INSERT WITH CHECK (public.is_admin());
+CREATE POLICY "Admins can update icons" ON public.icons FOR UPDATE USING (public.is_admin());
+CREATE POLICY "Admins can delete icons" ON public.icons FOR DELETE USING (public.is_admin());
+
+-- 9. Supabase Storage Buckets
 INSERT INTO storage.buckets (id, name, public) VALUES ('themes', 'themes', true) ON CONFLICT DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('previews', 'previews', true) ON CONFLICT DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('wallpapers', 'wallpapers', true) ON CONFLICT DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('icons', 'icons', true) ON CONFLICT DO NOTHING;
 
 -- Storage Policies
 CREATE POLICY "Public read storage themes" ON storage.objects FOR SELECT USING (bucket_id = 'themes');
 CREATE POLICY "Public read storage previews" ON storage.objects FOR SELECT USING (bucket_id = 'previews');
+CREATE POLICY "Public read storage wallpapers" ON storage.objects FOR SELECT USING (bucket_id = 'wallpapers');
+CREATE POLICY "Public read storage icons" ON storage.objects FOR SELECT USING (bucket_id = 'icons');
+
 CREATE POLICY "Admin upload storage themes" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'themes' AND public.is_admin());
 CREATE POLICY "Admin upload storage previews" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'previews' AND public.is_admin());
+CREATE POLICY "Admin upload storage wallpapers" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'wallpapers' AND public.is_admin());
+CREATE POLICY "Admin upload storage icons" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'icons' AND public.is_admin());
+
 CREATE POLICY "Admin delete storage themes" ON storage.objects FOR DELETE USING (bucket_id = 'themes' AND public.is_admin());
+CREATE POLICY "Admin delete storage wallpapers" ON storage.objects FOR DELETE USING (bucket_id = 'wallpapers' AND public.is_admin());
+CREATE POLICY "Admin delete storage icons" ON storage.objects FOR DELETE USING (bucket_id = 'icons' AND public.is_admin());
 ```
 
 ---

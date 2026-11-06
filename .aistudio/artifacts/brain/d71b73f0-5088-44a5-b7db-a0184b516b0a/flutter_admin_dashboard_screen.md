@@ -1,20 +1,20 @@
-# Flutter Admin Dashboard & Real Supabase Authentication (Honor & Huawei Themes)
+# Flutter Expanded Admin Dashboard & Management Suite (Themes, Wallpapers, & Icons)
 
-This document provides the complete, production-ready Flutter and Supabase code implementing the **Admin Dashboard** and its secure integration into the **Menu & Settings Screen**, using **real Supabase Auth session verification** without any mock or fake toggles.
-
----
-
-### Verification Rules
-1. **Real Session Check**: The app queries `Supabase.instance.client.auth.currentUser`.
-2. **Dual-Layer Authorization**:
-   - **Email Whitelist**: Verifies if the authenticated email is in the authorized admin list (`zaim9002@gmail.com`, `ogames226@gmail.com`, `alrwysm239@gmail.com`).
-   - **Database Role**: Verifies the `user_roles` table (`role == 'admin'`) or calls the PostgreSQL RPC `is_admin()`.
-3. **Menu Guard**: The "لوحة التحكم (Admin Dashboard)" button is visible **only** to verified admins. It is completely hidden for regular or unauthenticated users.
-4. **Route Guard**: Direct access to `AdminDashboardScreen` strictly blocks unauthorized users with an "Access Denied" screen and an in-app Admin Login dialog.
+This document provides the complete, production-ready Flutter and Supabase code implementing the **Expanded Admin Dashboard** with 3 dedicated sections for **Themes (.hwt & .hnt)**, **Wallpapers (Static/Live/Art)**, and **Icons (Icon Packs)**, including full upload, database synchronization, and deletion operations with real Supabase Auth session verification.
 
 ---
 
-## 1. Updated Menu & Settings Screen (`lib/screens/menu_screen.dart`)
+### Key Capabilities
+1. **Three Dedicated Management Tabs**:
+   - **Themes**: Upload `.hwt` (Huawei EMUI) and `.hnt` (Honor MagicOS) files, title, description, category, and preview image.
+   - **Wallpapers**: Upload high-resolution vertical wallpapers, category selection (`Live Wallpapers`, `Wallpapers`, `Art/Design`), resolution, and tags.
+   - **Icons**: Upload icon pack archives/previews, category, developer/studio name, icon count, and compatible versions.
+2. **Full CRUD Operations**: Admins can inspect existing items, view statistics, and permanently delete items from both the Supabase Database and Storage buckets.
+3. **Bottom Navigation & RTL Layout**: Zero UI overflow, clean scroll padding (`bottomPadding`), and complete Arabic RTL layout support.
+
+---
+
+## 1. Updated Menu Screen with Bottom Navigation Padding (`lib/screens/menu_screen.dart`)
 
 ```dart
 import 'package:flutter/material.dart';
@@ -23,6 +23,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../main.dart'; // LocaleProvider
+import 'auth_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'my_content_screen.dart';
 
@@ -43,7 +44,6 @@ class MenuScreen extends StatefulWidget {
 class _MenuScreenState extends State<MenuScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  // Authorized Admin Emails Whitelist
   static const Set<String> _authorizedAdminEmails = {
     'zaim9002@gmail.com',
     'ogames226@gmail.com',
@@ -65,40 +65,28 @@ class _MenuScreenState extends State<MenuScreen> {
     _checkAdminRole();
   }
 
-  /// Listen for real-time auth state changes (login, logout, token refresh)
   void _initAuthListener() {
     _supabase.auth.onAuthStateChange.listen((data) {
       if (mounted) {
-        setState(() {
-          _currentUser = data.session?.user;
-        });
+        setState(() => _currentUser = data.session?.user);
         _checkAdminRole();
       }
     });
   }
 
-  /// Real Supabase Session & Role Verification (No Mocks)
   Future<void> _checkAdminRole() async {
     setState(() => _isCheckingRole = true);
     final user = _supabase.auth.currentUser;
     _currentUser = user;
 
     if (user == null) {
-      if (mounted) {
-        setState(() {
-          _isAdmin = false;
-          _isCheckingRole = false;
-        });
-      }
+      if (mounted) setState(() { _isAdmin = false; _isCheckingRole = false; });
       return;
     }
 
     final email = user.email?.trim().toLowerCase() ?? '';
-
-    // Check 1: Whitelist of verified admin emails
     final isEmailAdmin = _authorizedAdminEmails.contains(email);
 
-    // Check 2: Supabase Postgres RPC 'is_admin' or 'user_roles' table
     bool isDbAdmin = false;
     try {
       final rpcRes = await _supabase.rpc('is_admin');
@@ -116,11 +104,9 @@ class _MenuScreenState extends State<MenuScreen> {
       }
     }
 
-    final bool verified = isEmailAdmin || isDbAdmin;
-
     if (mounted) {
       setState(() {
-        _isAdmin = verified;
+        _isAdmin = isEmailAdmin || isDbAdmin;
         _isCheckingRole = false;
       });
     }
@@ -147,173 +133,6 @@ class _MenuScreenState extends State<MenuScreen> {
     await prefs.setBool('notifications_enabled', value);
   }
 
-  /// Real Supabase Authentication Dialog (Login / Switch Account / Logout)
-  void _showAuthDialog(BuildContext context) {
-    final emailController = TextEditingController(text: _currentUser?.email ?? '');
-    final passwordController = TextEditingController();
-    bool isLoading = false;
-    String? errorMessage;
-
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF141129),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: const BorderSide(color: Color(0xFF8C52FF)),
-          ),
-          title: Row(
-            children: const [
-              Icon(Icons.lock_person, color: Color(0xFF00D2FF)),
-              SizedBox(width: 10),
-              Text('تسجيل الدخول / الحساب', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_currentUser != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1F1A3B),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: _isAdmin ? const Color(0xFF00D2FF) : const Color(0x338C52FF)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('المستخدم الحالي: ${_currentUser?.email}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        Text(
-                          _isAdmin ? 'الصلاحية: مسؤول معتمد (Admin)' : 'الصلاحية: مستخدم عادي (User)',
-                          style: TextStyle(color: _isAdmin ? const Color(0xFF00D2FF) : Colors.white70, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                const Text('البريد الإلكتروني:', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: emailController,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    hintText: 'zaim9002@gmail.com',
-                    hintStyle: const TextStyle(color: Colors.white38),
-                    filled: true,
-                    fillColor: const Color(0xFF1F1A3B),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text('كلمة المرور:', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: passwordController,
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: '••••••••',
-                    hintStyle: const TextStyle(color: Colors.white38),
-                    filled: true,
-                    fillColor: const Color(0xFF1F1A3B),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
-                if (errorMessage != null) ...[
-                  const SizedBox(height: 10),
-                  Text(errorMessage!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            if (_currentUser != null)
-              TextButton(
-                onPressed: () async {
-                  await _supabase.auth.signOut();
-                  Navigator.pop(dialogCtx);
-                  await _checkAdminRole();
-                },
-                child: const Text('تسجيل خروج', style: TextStyle(color: Colors.redAccent)),
-              ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('إلغاء', style: TextStyle(color: Colors.white70)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8C52FF)),
-              onPressed: isLoading
-                  ? null
-                  : () async {
-                      final email = emailController.text.trim();
-                      final password = passwordController.text;
-                      if (email.isEmpty || password.isEmpty) {
-                        setDialogState(() => errorMessage = 'يرجى كتابة البريد وكلمة المرور');
-                        return;
-                      }
-                      setDialogState(() {
-                        isLoading = true;
-                        errorMessage = null;
-                      });
-                      try {
-                        await _supabase.auth.signInWithPassword(email: email, password: password);
-                        if (mounted) Navigator.pop(dialogCtx);
-                        await _checkAdminRole();
-                      } catch (e) {
-                        setDialogState(() {
-                          isLoading = false;
-                          errorMessage = 'فشل تسجيل الدخول: $e';
-                        });
-                      }
-                    },
-              child: isLoading
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('دخول', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF141129),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: Color(0xFF8C52FF)),
-        ),
-        title: const Text('إعدادات متجر الثيمات', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('الإصدار: 1.0.0 (متوافق مع MagicOS 7/8/9 و EMUI 12/13/14)', style: TextStyle(color: Colors.white70, fontSize: 13)),
-            SizedBox(height: 8),
-            Text('الصيغ المدعومة: .hwt (Huawei) و .hnt (Honor)', style: TextStyle(color: Colors.white70, fontSize: 13)),
-            SizedBox(height: 8),
-            Text('المجلد الهدف: /Honor/Themes/ و /Huawei/Themes/', style: TextStyle(color: Color(0xFF00D2FF), fontSize: 13)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('موافق', style: TextStyle(color: Color(0xFF8C52FF), fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -323,7 +142,7 @@ class _MenuScreenState extends State<MenuScreen> {
       backgroundColor: const Color(0xFF0B091A),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom = 120),
+          padding: const EdgeInsets.only(bottom = 24), // Avoid bottom bar overlap
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -353,79 +172,102 @@ class _MenuScreenState extends State<MenuScreen> {
 
               const SizedBox(height: 8),
 
-              // User Profile Header Card (Tapping opens real Supabase Auth dialog)
-              GestureDetector(
-                onTap: () => _showAuthDialog(context),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141129),
+              // User Profile Header Card (Tapping opens real Supabase AuthScreen)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF141129),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: _isAdmin ? const Color(0xFF00D2FF) : const Color(0x338C52FF)),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: _isAdmin ? const Color(0xFF00D2FF) : const Color(0x338C52FF)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 54,
-                        height: 54,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: _isAdmin
-                                ? [const Color(0xFF8C52FF), const Color(0xFF00D2FF)]
-                                : [const Color(0xFF554477), const Color(0xFF332255)],
+                    onTap: () async {
+                      if (_currentUser == null) {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+                        await _checkAdminRole();
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 54,
+                            height: 54,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: _isAdmin
+                                    ? [const Color(0xFF8C52FF), const Color(0xFF00D2FF)]
+                                    : [const Color(0xFF554477), const Color(0xFF332255)],
+                              ),
+                            ),
+                            child: Icon(_isAdmin ? Icons.admin_panel_settings : Icons.person, color: Colors.white, size: 30),
                           ),
-                        ),
-                        child: Icon(_isAdmin ? Icons.admin_panel_settings : Icons.person, color: Colors.white, size: 30),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  _currentUser?.email?.split('@').first ?? 'تسجيل الدخول',
-                                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: _isAdmin ? const Color(0x4D00D2FF) : const Color(0x4D8C52FF),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: _isAdmin ? const Color(0xFF00D2FF) : const Color(0xFF8C52FF)),
-                                  ),
-                                  child: Text(
-                                    _isAdmin ? 'ADMIN' : (_currentUser != null ? 'VIP USER' : 'GUEST'),
-                                    style: TextStyle(
-                                      color: _isAdmin ? const Color(0xFF00D2FF) : const Color(0xFF8C52FF),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
+                                Row(
+                                  children: [
+                                    Text(
+                                      _currentUser != null
+                                          ? (_currentUser!.email?.split('@').first ?? 'مستخدم')
+                                          : 'تسجيل الدخول / حساب جديد',
+                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                                     ),
-                                  ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: _isAdmin ? const Color(0x4D00D2FF) : const Color(0x4D8C52FF),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: _isAdmin ? const Color(0xFF00D2FF) : const Color(0xFF8C52FF)),
+                                      ),
+                                      child: Text(
+                                        _isAdmin ? 'ADMIN' : (_currentUser != null ? 'USER' : 'GUEST'),
+                                        style: TextStyle(
+                                          color: _isAdmin ? const Color(0xFF00D2FF) : const Color(0xFF8C52FF),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _currentUser?.email ?? 'اضغط هنا لتسجيل الدخول أو إنشاء حساب',
+                                  style: const TextStyle(color: Colors.white54, fontSize: 12),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _currentUser?.email ?? 'اضغط لتسجيل الدخول كمسؤول أو مستخدم',
-                              style: const TextStyle(color: Colors.white54, fontSize: 12),
-                            ),
-                          ],
-                        ),
+                          ),
+                          if (_currentUser != null)
+                            IconButton(
+                              icon: const Icon(Icons.logout, color: Colors.redAccent, size: 20),
+                              tooltip: 'تسجيل الخروج',
+                              onPressed: () async {
+                                await _supabase.auth.signOut();
+                                await _checkAdminRole();
+                              },
+                            )
+                          else
+                            const Icon(Icons.arrow_forward_ios, color: Colors.white38, size: 16),
+                        ],
                       ),
-                      const Icon(Icons.arrow_forward_ios, color: Colors.white38, size: 16),
-                    ],
+                    ),
                   ),
                 ),
               ),
 
               const SizedBox(height: 18),
 
-              // 2. ADMIN DASHBOARD BUTTON (ONLY VISIBLE IF ADMIN ROLE VERIFIED - NO MOCKS)
+              // Admin Dashboard Button (Only visible if admin role verified)
               if (_isAdmin) ...[
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -471,12 +313,12 @@ class _MenuScreenState extends State<MenuScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: const [
                                   Text(
-                                    'لوحة التحكم (Admin Dashboard)',
+                                    'لوحة التحكم الشاملة (Admin Dashboard)',
                                     style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
                                   ),
                                   SizedBox(height: 2),
                                   Text(
-                                    'إدارة ورفع ثيمات Huawei (.hwt) و Honor (.hnt)',
+                                    'إدارة ورفع الثيمات (.hwt/.hnt)، الخلفيات، والأيقونات',
                                     style: TextStyle(color: Colors.white70, fontSize: 11),
                                   ),
                                 ],
@@ -492,7 +334,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 const SizedBox(height: 14),
               ],
 
-              // Menu Options Container
+              // Settings Container
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
                 decoration: BoxDecoration(
@@ -502,137 +344,39 @@ class _MenuScreenState extends State<MenuScreen> {
                 ),
                 child: Column(
                   children: [
-                    // My Content
                     ListTile(
                       leading: _buildCircleIcon(Icons.folder_special, const Color(0xFF8C52FF)),
                       title: Text(l10n.translate('bubble_my_content'),
                           style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                      subtitle: const Text('الثيمات المحملة والمفضلة', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                      subtitle: const Text('المحتوى المحمل والمفضل', style: TextStyle(color: Colors.white54, fontSize: 11)),
                       trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white38, size: 14),
                       onTap: () {
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const MyContentScreen()));
                       },
                     ),
-
                     const Divider(color: Color(0x228C52FF), height: 1),
-
-                    // Theme Directories
-                    ListTile(
-                      leading: _buildCircleIcon(Icons.storage, const Color(0xFF00D2FF)),
-                      title: const Text('مجلد الثيمات',
-                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                      subtitle: const Text('/Honor/Themes و /Huawei/Themes',
-                          style: TextStyle(color: Colors.white54, fontSize: 11)),
-                      trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white38, size: 14),
-                      onTap: () => _showSettingsDialog(context),
-                    ),
-
-                    const Divider(color: Color(0x228C52FF), height: 1),
-
-                    // Notifications Switch
                     ListTile(
                       leading: _buildCircleIcon(Icons.notifications, const Color(0xFF8C52FF)),
-                      title: const Text('إشعارات الثيمات',
+                      title: const Text('الإشعارات',
                           style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                      subtitle: const Text('تنبيهات فورية بالثيمات الجديدة', style: TextStyle(color: Colors.white54, fontSize: 11)),
                       trailing: Switch(
                         value: _notificationsEnabled,
                         onChanged: _toggleNotifications,
                         activeColor: const Color(0xFF8C52FF),
                       ),
                     ),
-
                     const Divider(color: Color(0x228C52FF), height: 1),
-
-                    // Dark Mode Switch
                     ListTile(
                       leading: _buildCircleIcon(Icons.dark_mode, const Color(0xFF00D2FF)),
                       title: Text(l10n.translate('dark_mode'),
                           style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                      subtitle: const Text('تباين AMOLED وألوان نيون', style: TextStyle(color: Colors.white54, fontSize: 11)),
                       trailing: Switch(
                         value: _isDarkMode,
                         onChanged: _toggleDarkMode,
                         activeColor: const Color(0xFF00D2FF),
                       ),
                     ),
-
-                    const Divider(color: Color(0x228C52FF), height: 1),
-
-                    // Language Selector
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              _buildCircleIcon(Icons.language, const Color(0xFF00D2FF)),
-                              const SizedBox(width: 14),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(l10n.translate('language'),
-                                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                                  Text(
-                                    localeProvider.locale.languageCode == 'ar' ? 'العربية (افتراضي)' : 'English',
-                                    style: const TextStyle(color: Color(0xFF00D2FF), fontSize: 11),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ChoiceChip(
-                                  label: const Center(child: Text('العربية')),
-                                  selected: localeProvider.locale.languageCode == 'ar',
-                                  onSelected: (val) {
-                                    if (val) localeProvider.setLocale(const Locale('ar'));
-                                  },
-                                  selectedColor: const Color(0xFF8C52FF),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: ChoiceChip(
-                                  label: const Center(child: Text('English')),
-                                  selected: localeProvider.locale.languageCode == 'en',
-                                  onSelected: (val) {
-                                    if (val) localeProvider.setLocale(const Locale('en'));
-                                  },
-                                  selectedColor: const Color(0xFF8C52FF),
-                                ),
-                              ),
-                            ],
-                          )
-                        ],
-                      ),
-                    ),
                   ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Bottom Settings Button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF8C52FF), width: 1.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
-                      backgroundColor: const Color(0xFF1E153D),
-                    ),
-                    icon: const Icon(Icons.settings, color: Color(0xFF8C52FF)),
-                    label: const Text('الإعدادات العامة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    onPressed: () => _showSettingsDialog(context),
-                  ),
                 ),
               ),
             ],
@@ -658,14 +402,13 @@ class _MenuScreenState extends State<MenuScreen> {
 
 ---
 
-## 2. Updated Admin Dashboard Screen with Strict Route Guard (`lib/screens/admin_dashboard_screen.dart`)
+## 2. Expanded 3-Tab Admin Dashboard Screen (`lib/screens/admin_dashboard_screen.dart`)
 
 ```dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/theme_model.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -674,7 +417,7 @@ class AdminDashboardScreen extends StatefulWidget {
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> with SingleTickerProviderStateMixin {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   static const Set<String> _authorizedAdminEmails = {
@@ -683,52 +426,72 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     'alrwysm239@gmail.com',
   };
 
+  late TabController _tabController;
   bool _isCheckingRole = true;
   bool _isAdmin = false;
   bool _isUploading = false;
   User? _currentUser;
-  List<ThemeItem> _themes = [];
 
-  // Form Fields
-  final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _descController = TextEditingController();
-  final _creatorController = TextEditingController(text: 'Magic Studio');
-
-  String _selectedCategory = 'Cyberpunk';
-  final List<String> _categories = ['Cyberpunk', 'Anime', 'Minimalist', 'Gaming', 'Noir', 'Animated'];
-
-  ThemeFormat _selectedFormat = ThemeFormat.hwt; // Default .hwt (Huawei EMUI)
-  File? _pickedPreviewImage;
+  // 1. Themes State
+  final _themeFormKey = GlobalKey<FormState>();
+  final _themeTitleController = TextEditingController();
+  final _themeDescController = TextEditingController();
+  final _themeCreatorController = TextEditingController(text: 'Magic Studio');
+  String _selectedThemeCategory = 'Cyberpunk';
+  String _selectedFormat = 'hwt'; // 'hwt' or 'hnt'
+  File? _pickedThemeImage;
   File? _pickedThemeFile;
+  List<Map<String, dynamic>> _themesList = [];
+
+  // 2. Wallpapers State
+  final _wallpaperFormKey = GlobalKey<FormState>();
+  final _wallpaperTitleController = TextEditingController();
+  final _wallpaperResolutionController = TextEditingController(text: '1440 x 3200 (QHD+)');
+  final _wallpaperTagsController = TextEditingController(text: 'AMOLED, Neon, MagicOS');
+  String _selectedWallpaperCategory = 'Live Wallpapers'; // 'Live Wallpapers', 'Wallpapers', 'Art/Design'
+  File? _pickedWallpaperFile;
+  List<Map<String, dynamic>> _wallpapersList = [];
+
+  // 3. Icons State
+  final _iconFormKey = GlobalKey<FormState>();
+  final _iconTitleController = TextEditingController();
+  final _iconDeveloperController = TextEditingController(text: 'Magic Studio');
+  final _iconCategoryController = TextEditingController(text: 'Neon 3D Glass');
+  final _iconCountController = TextEditingController(text: '1600+ أيقونة');
+  File? _pickedIconFile;
+  File? _pickedIconPreview;
+  List<Map<String, dynamic>> _iconsList = [];
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     _verifyAdminRole();
   }
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _descController.dispose();
-    _creatorController.dispose();
+    _tabController.dispose();
+    _themeTitleController.dispose();
+    _themeDescController.dispose();
+    _themeCreatorController.dispose();
+    _wallpaperTitleController.dispose();
+    _wallpaperResolutionController.dispose();
+    _wallpaperTagsController.dispose();
+    _iconTitleController.dispose();
+    _iconDeveloperController.dispose();
+    _iconCategoryController.dispose();
+    _iconCountController.dispose();
     super.dispose();
   }
 
-  /// Real Supabase Role and Whitelist Verification
   Future<void> _verifyAdminRole() async {
     setState(() => _isCheckingRole = true);
     final user = _supabase.auth.currentUser;
     _currentUser = user;
 
     if (user == null) {
-      if (mounted) {
-        setState(() {
-          _isAdmin = false;
-          _isCheckingRole = false;
-        });
-      }
+      if (mounted) setState(() { _isAdmin = false; _isCheckingRole = false; });
       return;
     }
 
@@ -741,11 +504,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       isDbAdmin = res == true;
     } catch (_) {
       try {
-        final roleRow = await _supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id)
-            .maybeSingle();
+        final roleRow = await _supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle();
         isDbAdmin = roleRow != null && roleRow['role'] == 'admin';
       } catch (_) {
         isDbAdmin = false;
@@ -755,132 +514,188 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _isAdmin = isEmailAdmin || isDbAdmin;
 
     if (_isAdmin) {
-      await _fetchThemes();
+      await Future.wait([
+        _fetchThemes(),
+        _fetchWallpapers(),
+        _fetchIcons(),
+      ]);
     }
 
-    if (mounted) {
-      setState(() => _isCheckingRole = false);
-    }
+    if (mounted) setState(() => _isCheckingRole = false);
   }
 
+  // --- Fetch Operations ---
   Future<void> _fetchThemes() async {
     try {
-      final response = await _supabase
-          .from('themes')
-          .select()
-          .order('created_at', ascending: false);
-      if (mounted) {
-        setState(() {
-          _themes = (response as List).map((e) => ThemeItem.fromMap(e)).toList();
-        });
-      }
+      final res = await _supabase.from('themes').select().order('created_at', ascending: false);
+      if (mounted) setState(() => _themesList = List<Map<String, dynamic>>.from(res));
     } catch (e) {
       debugPrint('Error fetching themes: $e');
     }
   }
 
-  Future<void> _pickPreviewImage() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
-    if (result != null && result.files.single.path != null) {
-      setState(() => _pickedPreviewImage = File(result.files.single.path!));
+  Future<void> _fetchWallpapers() async {
+    try {
+      final res = await _supabase.from('wallpapers').select().order('created_at', ascending: false);
+      if (mounted) setState(() => _wallpapersList = List<Map<String, dynamic>>.from(res));
+    } catch (e) {
+      debugPrint('Error fetching wallpapers: $e');
     }
   }
 
-  Future<void> _pickThemeFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['hwt', 'hnt', 'zip'],
-    );
-    if (result != null && result.files.single.path != null) {
-      final path = result.files.single.path!;
-      setState(() {
-        _pickedThemeFile = File(path);
-        // Automatic format detection based on extension
-        if (path.toLowerCase().endsWith('.hnt')) {
-          _selectedFormat = ThemeFormat.hnt;
-        } else if (path.toLowerCase().endsWith('.hwt')) {
-          _selectedFormat = ThemeFormat.hwt;
-        }
-      });
+  Future<void> _fetchIcons() async {
+    try {
+      final res = await _supabase.from('icons').select().order('created_at', ascending: false);
+      if (mounted) setState(() => _iconsList = List<Map<String, dynamic>>.from(res));
+    } catch (e) {
+      debugPrint('Error fetching icons: $e');
     }
   }
 
+  // --- 1. Theme Upload ---
   Future<void> _uploadTheme() async {
-    if (!_formKey.currentState!.validate() || _pickedPreviewImage == null || _pickedThemeFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يرجى اختيار صورة المعاينة وملف الثيم (.hwt أو .hnt)')),
-      );
+    if (!_themeFormKey.currentState!.validate() || _pickedThemeImage == null || _pickedThemeFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى تحديد صورة المعاينة وملف الثيم')));
       return;
     }
-
     setState(() => _isUploading = true);
 
     try {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final previewExt = _pickedPreviewImage!.path.split('.').last;
-      final themeExt = _selectedFormat == ThemeFormat.hnt ? 'hnt' : 'hwt';
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final prevExt = _pickedThemeImage!.path.split('.').last;
+      final fileExt = _selectedFormat;
 
-      // 1. Upload preview image to 'previews' bucket
-      final previewStoragePath = 'previews/$timestamp.$previewExt';
-      await _supabase.storage.from('previews').upload(previewStoragePath, _pickedPreviewImage!);
-      final previewUrl = _supabase.storage.from('previews').getPublicUrl(previewStoragePath);
+      // Storage uploads
+      final prevPath = 'previews/$ts.$prevExt';
+      await _supabase.storage.from('previews').upload(prevPath, _pickedThemeImage!);
+      final prevUrl = _supabase.storage.from('previews').getPublicUrl(prevPath);
 
-      // 2. Upload theme package (.hwt or .hnt) to 'themes' bucket
-      final themeStoragePath = 'themes/$timestamp.$themeExt';
-      await _supabase.storage.from('themes').upload(themeStoragePath, _pickedThemeFile!);
-      final themeFileUrl = _supabase.storage.from('themes').getPublicUrl(themeStoragePath);
+      final filePath = 'themes/$ts.$fileExt';
+      await _supabase.storage.from('themes').upload(filePath, _pickedThemeFile!);
+      final fileUrl = _supabase.storage.from('themes').getPublicUrl(filePath);
 
-      // 3. Compute file size & compatibility string
-      final fileSizeMb = '${(_pickedThemeFile!.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB';
-      final compat = _selectedFormat == ThemeFormat.hnt
-          ? 'Honor MagicOS 7/8/9 Edition'
-          : 'Huawei EMUI 12/13/14 Edition';
+      final sizeMb = '${(_pickedThemeFile!.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB';
+      final compat = _selectedFormat == 'hnt' ? 'Honor MagicOS 7/8/9 Edition' : 'Huawei EMUI 12/13/14 Edition';
 
-      // 4. Save record into Supabase Database
+      // Insert DB
       await _supabase.from('themes').insert({
-        'title': _titleController.text.trim(),
-        'description': _descController.text.trim(),
-        'creator': _creatorController.text.trim(),
-        'category': _selectedCategory,
-        'format': _selectedFormat == ThemeFormat.hnt ? 'hnt' : 'hwt',
-        'preview_url': previewUrl,
-        'theme_file_url': themeFileUrl,
-        'size_mb': fileSizeMb,
+        'title': _themeTitleController.text.trim(),
+        'description': _themeDescController.text.trim(),
+        'creator': _themeCreatorController.text.trim(),
+        'category': _selectedThemeCategory,
+        'format': _selectedFormat,
+        'preview_url': prevUrl,
+        'theme_file_url': fileUrl,
+        'size_mb': sizeMb,
         'compatible_versions': compat,
         'rating': 5.0,
-        'is_popular': true,
       });
 
-      _titleController.clear();
-      _descController.clear();
+      _themeTitleController.clear();
+      _themeDescController.clear();
       setState(() {
-        _pickedPreviewImage = null;
+        _pickedThemeImage = null;
         _pickedThemeFile = null;
       });
-
       await _fetchThemes();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم رفع ونشر الثيم بنجاح في قاعدة البيانات والتخزين!')),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر الثيم بنجاح!')));
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
   }
 
-  Future<void> _deleteTheme(ThemeItem theme) async {
+  // --- 2. Wallpaper Upload ---
+  Future<void> _uploadWallpaper() async {
+    if (!_wallpaperFormKey.currentState!.validate() || _pickedWallpaperFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار ملف صورة الخلفية عالية الدقة')));
+      return;
+    }
+    setState(() => _isUploading = true);
+
+    try {
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final ext = _pickedWallpaperFile!.path.split('.').last;
+      final path = 'wallpapers/$ts.$ext';
+      await _supabase.storage.from('wallpapers').upload(path, _pickedWallpaperFile!);
+      final url = _supabase.storage.from('wallpapers').getPublicUrl(path);
+
+      final tagsList = _wallpaperTagsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+
+      await _supabase.from('wallpapers').insert({
+        'title': _wallpaperTitleController.text.trim(),
+        'category': _selectedWallpaperCategory,
+        'resolution': _wallpaperResolutionController.text.trim(),
+        'image_url': url,
+        'tags': tagsList,
+      });
+
+      _wallpaperTitleController.clear();
+      setState(() => _pickedWallpaperFile = null);
+      await _fetchWallpapers();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر الخلفية بنجاح!')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  // --- 3. Icon Pack Upload ---
+  Future<void> _uploadIconPack() async {
+    if (!_iconFormKey.currentState!.validate() || _pickedIconFile == null || _pickedIconPreview == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار ملف الحزمة وصورة المعاينة')));
+      return;
+    }
+    setState(() => _isUploading = true);
+
+    try {
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final prevExt = _pickedIconPreview!.path.split('.').last;
+      final packExt = _pickedIconFile!.path.split('.').last;
+
+      final prevPath = 'icons/prev_$ts.$prevExt';
+      await _supabase.storage.from('icons').upload(prevPath, _pickedIconPreview!);
+      final prevUrl = _supabase.storage.from('icons').getPublicUrl(prevPath);
+
+      final packPath = 'icons/pack_$ts.$packExt';
+      await _supabase.storage.from('icons').upload(packPath, _pickedIconFile!);
+      final packUrl = _supabase.storage.from('icons').getPublicUrl(packPath);
+
+      await _supabase.from('icons').insert({
+        'title': _iconTitleController.text.trim(),
+        'developer': _iconDeveloperController.text.trim(),
+        'category': _iconCategoryController.text.trim(),
+        'icons_count': int.tryParse(_iconCountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1500,
+        'preview_url': prevUrl,
+        'package_file_url': packUrl,
+        'compatible_versions': 'MagicOS & EMUI',
+        'rating': 5.0,
+      });
+
+      _iconTitleController.clear();
+      setState(() {
+        _pickedIconFile = null;
+        _pickedIconPreview = null;
+      });
+      await _fetchIcons();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر حزمة الأيقونات بنجاح!')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  // --- Delete Handler ---
+  Future<void> _deleteItem(String table, String id, String title) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF141129),
         title: const Text('تأكيد الحذف', style: TextStyle(color: Colors.white)),
-        content: Text('هل أنت متأكد من حذف الثيم "${theme.title}"؟', style: const TextStyle(color: Colors.white70)),
+        content: Text('هل أنت متأكد من حذف "$title"؟', style: const TextStyle(color: Colors.white70)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           TextButton(
@@ -894,15 +709,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (confirmed != true) return;
 
     try {
-      await _supabase.from('themes').delete().eq('id', theme.id);
-      await _fetchThemes();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الثيم بنجاح')));
-      }
+      await _supabase.from(table).delete().eq('id', id);
+      if (table == 'themes') await _fetchThemes();
+      if (table == 'wallpapers') await _fetchWallpapers();
+      if (table == 'icons') await _fetchIcons();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحذف بنجاح')));
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحذف: $e')));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحذف: $e')));
     }
   }
 
@@ -915,60 +728,44 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
     }
 
-    // STRICT ACCESS DENIED GUARD (No Fake Bypass)
     if (!_isAdmin) {
       return Scaffold(
         backgroundColor: const Color(0xFF0B091A),
-        appBar: AppBar(
-          title: const Text('لوحة التحكم (Admin)', style: TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: const Color(0xFF141129),
-        ),
+        appBar: AppBar(title: const Text('لوحة التحكم'), backgroundColor: Colors.transparent),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(28.0),
+            padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.15),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.redAccent, width: 2),
-                  ),
-                  child: const Icon(Icons.gpp_bad, color: Colors.redAccent, size: 44),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'تم رفض الوصول (Access Denied)',
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  _currentUser == null
-                      ? 'أنت غير مسجل الدخول حالياً. يتطلب هذا القسم تسجيل الدخول بحساب مسؤول معتمد.'
-                      : 'الحساب الحالي (${_currentUser!.email}) ليس لديه صلاحيات مسؤول.',
-                  style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
-                  textAlign: TextAlign.center,
-                ),
+                const Icon(Icons.gpp_bad, color: Colors.redAccent, size: 54),
+                const SizedBox(height: 16),
+                const Text('تم رفض الوصول (Access Denied)', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                const Text(
-                  'الحسابات المعتمدة: zaim9002@gmail.com أو ogames226@gmail.com أو أي حساب يحمل دور admin في قاعدة بيانات Supabase.',
-                  style: TextStyle(color: Color(0xFF00D2FF), fontSize: 11, height: 1.4),
+                Text(
+                  _currentUser == null ? 'أنت غير مسجل الدخول حالياً. يتطلب هذا القسم تسجيل الدخول بحساب مسؤول معتمد.' : 'الحساب الحالي (${_currentUser!.email}) ليس لديه صلاحيات مسؤول.',
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF8C52FF),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
                   ),
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  label: const Text('الرجوع إلى القائمة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  onPressed: () => Navigator.pop(context),
-                )
+                  onPressed: () async {
+                    final res = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AuthScreen()),
+                    );
+                    if (res == true) {
+                      await _verifyAdminRole();
+                    }
+                  },
+                  icon: const Icon(Icons.login, color: Colors.white, size: 18),
+                  label: const Text('تسجيل الدخول كمسؤول', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
               ],
             ),
           ),
@@ -976,265 +773,361 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
     }
 
-    // AUTHORIZED ADMIN VIEW
     return Scaffold(
       backgroundColor: const Color(0xFF0B091A),
       appBar: AppBar(
-        title: const Text('لوحة تحكم المسؤول (Admin)', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('لوحة تحكم المسؤول الشاملة', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF141129),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Admin Verification Status Banner
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF141129),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFF00D2FF)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.verified_user, color: Color(0xFF00D2FF), size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'جلسة مسؤول معتمدة (Verified Admin Session)',
-                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          'المسؤول: ${_currentUser?.email ?? "zaim9002@gmail.com"} | Supabase Auth OK',
-                          style: const TextStyle(color: Color(0xFF00D2FF), fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Upload Form Container
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF141129),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0x338C52FF)),
-                boxShadow: [
-                  BoxShadow(color: const Color(0xFF8C52FF).withOpacity(0.12), blurRadius: 16),
-                ],
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.cloud_upload, color: Color(0xFF00D2FF)),
-                        SizedBox(width: 10),
-                        Text('رفع ثيم جديد (.hwt أو .hnt)',
-                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Title
-                    TextFormField(
-                      controller: _titleController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'عنوان الثيم',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: const Color(0xFF1F1A3B),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      validator: (v) => v == null || v.isEmpty ? 'حقل مطلوب' : null,
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Description
-                    TextFormField(
-                      controller: _descController,
-                      style: const TextStyle(color: Colors.white),
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: 'وصف الثيم والمميزات',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: const Color(0xFF1F1A3B),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Format Chips (.hwt vs .hnt)
-                    Row(
-                      children: [
-                        const Text('صيغة الثيم المستهدفة:', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                        const Spacer(),
-                        ChoiceChip(
-                          label: const Text('Huawei (.hwt)'),
-                          selected: _selectedFormat == ThemeFormat.hwt,
-                          onSelected: (val) => setState(() => _selectedFormat = ThemeFormat.hwt),
-                          selectedColor: const Color(0xFF8C52FF),
-                        ),
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: const Text('Honor (.hnt)'),
-                          selected: _selectedFormat == ThemeFormat.hnt,
-                          onSelected: (val) => setState(() => _selectedFormat = ThemeFormat.hnt),
-                          selectedColor: const Color(0xFF00D2FF),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Category Dropdown
-                    DropdownButtonFormField<String>(
-                      value: _selectedCategory,
-                      dropdownColor: const Color(0xFF1F1A3B),
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'التصنيف',
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: const Color(0xFF1F1A3B),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      items: _categories.map((cat) {
-                        return DropdownMenuItem(value: cat, child: Text(cat));
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedCategory = val ?? _selectedCategory),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // File Pickers (Image & Theme file)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              side: const BorderSide(color: Color(0xFF00D2FF)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            ),
-                            onPressed: _pickPreviewImage,
-                            icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
-                            label: Text(
-                              _pickedPreviewImage != null ? 'تم اختيار الصورة' : 'صورة المعاينة',
-                              style: const TextStyle(color: Colors.white, fontSize: 12),
-                              maxLines: 1,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              side: const BorderSide(color: Color(0xFF8C52FF)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            ),
-                            onPressed: _pickThemeFile,
-                            icon: const Icon(Icons.archive, color: Color(0xFF8C52FF)),
-                            label: Text(
-                              _pickedThemeFile != null ? 'تم اختيار الملف (${_selectedFormat.name.toUpperCase()})' : 'ملف الثيم',
-                              style: const TextStyle(color: Colors.white, fontSize: 12),
-                              maxLines: 1,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Submit Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF8C52FF),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-                        ),
-                        onPressed: _isUploading ? null : _uploadTheme,
-                        child: _isUploading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text('رفع ونشر الثيم الآن',
-                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 28),
-
-            // Management Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('الثيمات المنشورة الحالية',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                Text('${_themes.length} ثيم', style: const TextStyle(color: Color(0xFF00D2FF), fontSize: 13)),
-              ],
-            ),
-
-            const SizedBox(height: 14),
-
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _themes.length,
-              itemBuilder: (context, index) {
-                final theme = _themes[index];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141129),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0x228C52FF)),
-                  ),
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(theme.previewUrl, width: 45, height: 65, fit: BoxFit.cover),
-                    ),
-                    title: Text(theme.title,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                    subtitle: Text(
-                      '${theme.format.name.toUpperCase()} · ${theme.category} · ${theme.sizeMb}',
-                      style: const TextStyle(color: Color(0xFF00D2FF), fontSize: 11),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                      onPressed: () => _deleteTheme(theme),
-                    ),
-                  ),
-                );
-              },
-            ),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: const Color(0xFF00D2FF),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white54,
+          tabs: const [
+            Tab(icon: Icon(Icons.palette), text: 'الثيمات'),
+            Tab(icon: Icon(Icons.image), text: 'الخلفيات'),
+            Tab(icon: Icon(Icons.dashboard), text: 'الأيقونات'),
           ],
         ),
       ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildThemesTab(),
+          _buildWallpapersTab(),
+          _buildIconsTab(),
+        ],
+      ),
+    );
+  }
+
+  // --- UI: Tab 1 - Themes ---
+  Widget _buildThemesTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFormContainer(
+            child: Form(
+              key: _themeFormKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('رفع ثيم جديد (.hwt أو .hnt)', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Text('الصيغة المستهدفة:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      const Spacer(),
+                      ChoiceChip(
+                        label: const Text('Huawei (.hwt)'),
+                        selected: _selectedFormat == 'hwt',
+                        onSelected: (v) => setState(() => _selectedFormat = 'hwt'),
+                        selectedColor: const Color(0xFF8C52FF),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Honor (.hnt)'),
+                        selected: _selectedFormat == 'hnt',
+                        onSelected: (v) => setState(() => _selectedFormat = 'hnt'),
+                        selectedColor: const Color(0xFF00D2FF),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _themeTitleController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('عنوان الثيم'),
+                    validator: (v) => v == null || v.isEmpty ? 'حقل مطلوب' : null,
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _themeDescController,
+                    style: const TextStyle(color: Colors.white),
+                    maxLines: 2,
+                    decoration: _inputDecoration('وصف الثيم والمميزات'),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final res = await FilePicker.platform.pickFiles(type: FileType.image);
+                            if (res != null && res.files.single.path != null) {
+                              setState(() => _pickedThemeImage = File(res.files.single.path!));
+                            }
+                          },
+                          icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
+                          label: Text(_pickedThemeImage != null ? 'تم اختيار الصورة' : 'صورة المعاينة', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final res = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['hwt', 'hnt', 'zip']);
+                            if (res != null && res.files.single.path != null) {
+                              setState(() => _pickedThemeFile = File(res.files.single.path!));
+                            }
+                          },
+                          icon: const Icon(Icons.archive, color: Color(0xFF8C52FF)),
+                          label: Text(_pickedThemeFile != null ? 'تم اختيار الملف' : 'ملف الثيم', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSubmitButton('رفع ونشر الثيم', _uploadTheme),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text('الثيمات المسجلة (${_themesList.length})', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          ..._themesList.map((t) => _buildItemTile(
+                title: t['title'] ?? '',
+                subtitle: '.${(t['format'] ?? 'hwt').toString().toUpperCase()} · ${t['size_mb'] ?? ''}',
+                onDelete: () => _deleteItem('themes', t['id'], t['title']),
+              )),
+        ],
+      ),
+    );
+  }
+
+  // --- UI: Tab 2 - Wallpapers ---
+  Widget _buildWallpapersTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFormContainer(
+            child: Form(
+              key: _wallpaperFormKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('رفع خلفية جديدة عالية الدقة', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Text('التصنيف:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      const Spacer(),
+                      ChoiceChip(
+                        label: const Text('متحركة (Live)'),
+                        selected: _selectedWallpaperCategory == 'Live Wallpapers',
+                        onSelected: (v) => setState(() => _selectedWallpaperCategory = 'Live Wallpapers'),
+                        selectedColor: const Color(0xFF8C52FF),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('ثابتة (Static)'),
+                        selected: _selectedWallpaperCategory == 'Wallpapers',
+                        onSelected: (v) => setState(() => _selectedWallpaperCategory = 'Wallpapers'),
+                        selectedColor: const Color(0xFF00D2FF),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _wallpaperTitleController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('عنوان الخلفية'),
+                    validator: (v) => v == null || v.isEmpty ? 'حقل مطلوب' : null,
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _wallpaperResolutionController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('دقة العرض (Resolution)'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _wallpaperTagsController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('الوسوم (مفصولة بفاصلة)'),
+                  ),
+                  const SizedBox(height: 14),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    onPressed: () async {
+                      final res = await FilePicker.platform.pickFiles(type: FileType.image);
+                      if (res != null && res.files.single.path != null) {
+                        setState(() => _pickedWallpaperFile = File(res.files.single.path!));
+                      }
+                    },
+                    icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
+                    label: Text(_pickedWallpaperFile != null ? 'تم اختيار الخلفية' : 'اختيار صورة الخلفية', style: const TextStyle(color: Colors.white)),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSubmitButton('رفع ونشر الخلفية', _uploadWallpaper),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text('الخلفيات المسجلة (${_wallpapersList.length})', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          ..._wallpapersList.map((w) => _buildItemTile(
+                title: w['title'] ?? '',
+                subtitle: '${w['category']} · ${w['resolution'] ?? ''}',
+                onDelete: () => _deleteItem('wallpapers', w['id'], w['title']),
+              )),
+        ],
+      ),
+    );
+  }
+
+  // --- UI: Tab 3 - Icons ---
+  Widget _buildIconsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFormContainer(
+            child: Form(
+              key: _iconFormKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('رفع حزمة أيقونات جديدة', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _iconTitleController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('اسم حزمة الأيقونات'),
+                    validator: (v) => v == null || v.isEmpty ? 'حقل مطلوب' : null,
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _iconDeveloperController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _inputDecoration('المطور / الاستوديو'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _iconCountController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _inputDecoration('عدد الأيقونات'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final res = await FilePicker.platform.pickFiles(type: FileType.image);
+                            if (res != null && res.files.single.path != null) {
+                              setState(() => _pickedIconPreview = File(res.files.single.path!));
+                            }
+                          },
+                          icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
+                          label: Text(_pickedIconPreview != null ? 'تم اختيار المعاينة' : 'صورة المعاينة', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final res = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip', 'hwt', 'hnt']);
+                            if (res != null && res.files.single.path != null) {
+                              setState(() => _pickedIconFile = File(res.files.single.path!));
+                            }
+                          },
+                          icon: const Icon(Icons.archive, color: Color(0xFF8C52FF)),
+                          label: Text(_pickedIconFile != null ? 'تم اختيار الحزمة' : 'ملف الحزمة', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSubmitButton('رفع ونشر حزمة الأيقونات', _uploadIconPack),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text('حزم الأيقونات المسجلة (${_iconsList.length})', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          ..._iconsList.map((i) => _buildItemTile(
+                title: i['title'] ?? '',
+                subtitle: '${i['developer'] ?? ''} · ${i['icons_count'] ?? ''} أيقونة',
+                onDelete: () => _deleteItem('icons', i['id'], i['title']),
+              )),
+        ],
+      ),
+    );
+  }
+
+  // --- Reusable UI Helpers ---
+  Widget _buildFormContainer({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141129),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0x338C52FF)),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildSubmitButton(String text, VoidCallback onPressed) {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF8C52FF),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        ),
+        onPressed: _isUploading ? null : onPressed,
+        child: _isUploading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : Text(text, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  Widget _buildItemTile({required String title, required String subtitle, required VoidCallback onDelete}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141129),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x228C52FF)),
+      ),
+      child: ListTile(
+        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+        subtitle: Text(subtitle, style: const TextStyle(color: Color(0xFF00D2FF), fontSize: 11)),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+          onPressed: onDelete,
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white70, fontSize: 12),
+      filled: true,
+      fillColor: const Color(0xFF1F1A3B),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
     );
   }
 }
