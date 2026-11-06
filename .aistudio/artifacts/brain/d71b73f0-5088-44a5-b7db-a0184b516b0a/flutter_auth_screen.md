@@ -21,6 +21,7 @@ This document provides the complete, production-ready Flutter authentication scr
 ```dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/auth_service.dart';
 
 class AuthScreen extends StatefulWidget {
   final VoidCallback? onAuthSuccess;
@@ -32,7 +33,6 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final SupabaseClient _supabase = Supabase.instance.client;
   final _formKey = GlobalKey<FormState>();
 
   final _emailController = TextEditingController();
@@ -52,7 +52,7 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  // --- Real Supabase Auth Execution ---
+  // --- Real Supabase Auth Execution via AuthService ---
   Future<void> _handleAuth() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -66,50 +66,38 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isSignUp) {
-        // 1. Sign Up new account
-        final AuthResponse res = await _supabase.auth.signUp(
+        // 1. Sign Up new account with persistent session & role check
+        await AuthService.instance.signUp(
           email: email,
           password: password,
         );
 
-        if (res.user != null) {
-          // Initialize role in user_roles table
-          try {
-            await _supabase.from('user_roles').upsert({
-              'user_id': res.user!.id,
-              'role': 'user',
-            });
-          } catch (_) {}
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('تم إنشاء الحساب بنجاح! تم تسجيل الدخول تلقائياً.'),
-                backgroundColor: Color(0xFF10B981),
-              ),
-            );
-            widget.onAuthSuccess?.call();
-            Navigator.pop(context, true);
-          }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم إنشاء الحساب بنجاح! تم تسجيل الدخول وحفظ الجلسة تلقائياً.'),
+              backgroundColor: Color(0xFF10B981),
+            ),
+          );
+          widget.onAuthSuccess?.call();
+          Navigator.pop(context, true);
         }
       } else {
-        // 2. Sign In existing user
-        final AuthResponse res = await _supabase.auth.signInWithPassword(
+        // 2. Sign In existing user with persistent session & role check
+        await AuthService.instance.signInWithPassword(
           email: email,
           password: password,
         );
 
-        if (res.user != null) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('مرحباً بك مجدداً: ${res.user!.email}'),
-                backgroundColor: const Color(0xFF00D2FF),
-              ),
-            );
-            widget.onAuthSuccess?.call();
-            Navigator.pop(context, true);
-          }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('مرحباً بك مجدداً: $email (${AuthService.instance.isAdmin ? "مسؤول" : "مستخدم"})'),
+              backgroundColor: const Color(0xFF00D2FF),
+            ),
+          );
+          widget.onAuthSuccess?.call();
+          Navigator.pop(context, true);
         }
       }
     } on AuthException catch (e) {

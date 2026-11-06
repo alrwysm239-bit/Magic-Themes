@@ -87,6 +87,10 @@ import com.example.ui.theme.TextSecondary
 fun MenuScreen(
     themeEngineManager: ThemeEngineManager,
     onNavigateToMyContent: () -> Unit,
+    currentUserEmail: String = "",
+    isAdmin: Boolean = false,
+    onLogin: (String) -> Unit = {},
+    onLogout: () -> Unit = {},
     onLanguageChanged: (AppLanguage) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -103,9 +107,7 @@ fun MenuScreen(
     var showAdminDashboardDialog by remember { mutableStateOf(false) }
 
     val adminEmails = remember { setOf("zaim9002@gmail.com", "ogames226@gmail.com", "alrwysm239@gmail.com") }
-    var currentUserEmail by remember { mutableStateOf("") } // Starts unauthenticated as guest, no fake admin
     val isAuthenticated = currentUserEmail.isNotBlank()
-    val isAdmin = isAuthenticated && adminEmails.contains(currentUserEmail.trim().lowercase())
 
     Column(
         modifier = modifier
@@ -229,7 +231,7 @@ fun MenuScreen(
             if (isAuthenticated) {
                 IconButton(
                     onClick = {
-                        currentUserEmail = ""
+                        onLogout()
                         Toast.makeText(context, "تم تسجيل الخروج بنجاح", Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.size(32.dp)
@@ -807,7 +809,7 @@ fun MenuScreen(
                     if (isAuthenticated) {
                         TextButton(
                             onClick = {
-                                currentUserEmail = ""
+                                onLogout()
                                 showAuthDialog = false
                                 Toast.makeText(context, "تم تسجيل الخروج بنجاح", Toast.LENGTH_SHORT).show()
                             },
@@ -834,7 +836,7 @@ fun MenuScreen(
                         return@TextButton
                     }
 
-                    currentUserEmail = trimmedEmail
+                    onLogin(trimmedEmail)
                     showAuthDialog = false
                     val roleLabel = if (adminEmails.contains(trimmedEmail.lowercase())) "مسؤول معتمد (Admin)" else "مستخدم مسجل (User)"
                     val welcomeMsg = if (isSignUpMode) "تم إنشاء الحساب بنجاح: $trimmedEmail ($roleLabel)" else "تم تسجيل الدخول بنجاح: $trimmedEmail ($roleLabel)"

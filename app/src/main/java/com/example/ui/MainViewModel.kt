@@ -60,6 +60,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentLanguage = MutableStateFlow(com.example.ui.theme.AppLanguage.ARABIC)
     val currentLanguage: StateFlow<com.example.ui.theme.AppLanguage> = _currentLanguage.asStateFlow()
 
+    // --- Session Persistence using SharedPreferences ---
+    private val prefs = application.getSharedPreferences("magic_themes_auth_prefs", android.content.Context.MODE_PRIVATE)
+    val adminEmails = setOf("zaim9002@gmail.com", "ogames226@gmail.com", "alrwysm239@gmail.com")
+
+    private val initialPersistedEmail = prefs.getString("persisted_user_email", "") ?: ""
+    private val _currentUserEmail = MutableStateFlow(initialPersistedEmail)
+    val currentUserEmail: StateFlow<String> = _currentUserEmail.asStateFlow()
+
+    private val _isAdmin = MutableStateFlow(
+        initialPersistedEmail.isNotBlank() && adminEmails.contains(initialPersistedEmail.trim().lowercase())
+    )
+    val isAdmin: StateFlow<Boolean> = _isAdmin.asStateFlow()
+
+    fun loginUser(email: String) {
+        val cleanEmail = email.trim()
+        _currentUserEmail.value = cleanEmail
+        val isUserAdmin = cleanEmail.isNotBlank() && adminEmails.contains(cleanEmail.lowercase())
+        _isAdmin.value = isUserAdmin
+        prefs.edit().putString("persisted_user_email", cleanEmail).apply()
+    }
+
+    fun logoutUser() {
+        _currentUserEmail.value = ""
+        _isAdmin.value = false
+        prefs.edit().remove("persisted_user_email").apply()
+    }
+
     fun setLanguage(language: com.example.ui.theme.AppLanguage) {
         _currentLanguage.value = language
     }

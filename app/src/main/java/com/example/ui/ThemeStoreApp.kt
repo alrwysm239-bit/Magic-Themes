@@ -50,6 +50,8 @@ fun ThemeStoreApp(
     val selectedTheme by viewModel.selectedTheme.collectAsStateWithLifecycle()
     val selectedCategoryInitial by viewModel.selectedCategoryInitial.collectAsStateWithLifecycle()
     val currentLanguage by viewModel.currentLanguage.collectAsStateWithLifecycle()
+    val currentUserEmail by viewModel.currentUserEmail.collectAsStateWithLifecycle()
+    val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
 
     val currentStrings = when (currentLanguage) {
         AppLanguage.ARABIC -> ArabicStrings
@@ -180,6 +182,10 @@ fun ThemeStoreApp(
                                         MenuScreen(
                                             themeEngineManager = viewModel.themeEngineManager,
                                             onNavigateToMyContent = { viewModel.openMyContent() },
+                                            currentUserEmail = currentUserEmail,
+                                            isAdmin = isAdmin,
+                                            onLogin = { viewModel.loginUser(it) },
+                                            onLogout = { viewModel.logoutUser() },
                                             onLanguageChanged = { viewModel.setLanguage(it) }
                                         )
                                     }

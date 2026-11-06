@@ -1,0 +1,5 @@
+{
+  "summary": "Complete Flutter Supabase Session Persistence architecture and AuthService singleton with StreamBuilder<AuthState>, SharedPreferences role caching, and multi-tab synchronization to eliminate auto-logout bugs.",
+  "updatedAt": "2026-11-06T12:15:02.824472562Z",
+  "userFacing": true
+}
