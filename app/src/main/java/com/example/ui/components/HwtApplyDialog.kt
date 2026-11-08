@@ -121,19 +121,28 @@ fun HwtApplyDialog(
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    val isHonor = hwtFile?.name?.endsWith(".hnt", ignoreCase = true) == true || themeTitle.contains("Honor", ignoreCase = true)
+                    val platformName = if (isHonor) "Honor (MagicOS)" else "Huawei (EMUI)"
+                    val formatExt = if (isHonor) ".hnt" else ".hwt"
+                    val targetFolder = if (isHonor) "Honor/Themes" else "Huawei/Themes"
+
                     InstructionStep(
                         step = "1",
-                        text = strings.step1
+                        text = "تم إنشاء وحفظ حزمة $formatExt في مجلد $targetFolder بجهازك."
                     )
                     InstructionStep(
                         step = "2",
-                        text = strings.step2
+                        text = "افتح تطبيق ثيمات $platformName المثبت مسبقاً بهاتفك."
                     )
                     InstructionStep(
                         step = "3",
-                        text = strings.step3
+                        text = "انتقل إلى: أنا (Moi / Me) > ثيماتي (My Themes)، واختر الثيم ثم اضغط تطبيق."
                     )
                 }
+
+                val isHonorTheme = hwtFile?.name?.endsWith(".hnt", ignoreCase = true) == true || themeTitle.contains("Honor", ignoreCase = true)
+                val platformNameBtn = if (isHonorTheme) "Honor" else "Huawei"
+                val formatExtBtn = if (isHonorTheme) ".hnt" else ".hwt"
 
                 // Action buttons
                 Column(
@@ -141,7 +150,7 @@ fun HwtApplyDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     NeonGradientButton(
-                        text = strings.btnOpenNativeManager,
+                        text = "فتح تطبيق ثيمات $platformNameBtn",
                         icon = Icons.Default.Launch,
                         onClick = onOpenThemeManager,
                         modifier = Modifier.fillMaxWidth(),
@@ -168,7 +177,7 @@ fun HwtApplyDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = strings.btnShareHwt,
+                                text = "مشاركة أو تطبيق حزمة $formatExtBtn",
                                 color = TextPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold

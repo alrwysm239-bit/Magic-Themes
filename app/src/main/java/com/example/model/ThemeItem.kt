@@ -18,6 +18,13 @@ data class ThemeItem(
     val description: String = "Thème exclusif haute définition avec icônes 3D futuristes, widget horloge néon dynamique, et écran de verrouillage interactif pour EMUI et MagicOS.",
     val compatibleVersions: String = "MagicOS 7/8/9 & EMUI 12/13/14",
     val hwtFileName: String = "magic_theme_pack.hwt",
+    val format: String = if (hwtFileName.endsWith(".hnt", ignoreCase = true)) "hnt" else "hwt",
     val isDownloaded: Boolean = false,
     val isFavorite: Boolean = false
-)
+) {
+    val isHonor: Boolean get() = format.equals("hnt", ignoreCase = true) || hwtFileName.endsWith(".hnt", ignoreCase = true)
+    val isHuawei: Boolean get() = format.equals("hwt", ignoreCase = true) || hwtFileName.endsWith(".hwt", ignoreCase = true)
+    val platformLabel: String get() = if (isHonor) "Honor (.hnt)" else "Huawei (.hwt)"
+    val fileExtension: String get() = if (isHonor) ".hnt" else ".hwt"
+    val targetDirectoryName: String get() = if (isHonor) "Honor/Themes" else "Huawei/Themes"
+}

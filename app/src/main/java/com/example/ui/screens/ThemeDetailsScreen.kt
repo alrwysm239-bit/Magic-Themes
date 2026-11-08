@@ -265,7 +265,8 @@ fun ThemeDetailsScreen(
                     fontWeight = FontWeight.Bold
                 )
 
-                SpecRow(label = strings.formatLabel, value = ".HWT (Huawei/Honor Archive)")
+                SpecRow(label = strings.formatLabel, value = if (theme.isHonor) ".HNT (Honor MagicOS)" else ".HWT (Huawei EMUI)")
+                SpecRow(label = "المجلد المستهدف", value = theme.targetDirectoryName)
                 SpecRow(label = strings.compatibilityLabel, value = theme.compatibleVersions)
                 SpecRow(label = strings.sizeLabel, value = theme.sizeMb)
                 SpecRow(label = strings.contentLabel, value = "Écran de verrouillage, Icônes 3D, Widgets, Fond QHD+")
@@ -312,14 +313,22 @@ fun ThemeDetailsScreen(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val downloadBtnText = if (theme.isDownloaded) {
+                strings.btnApply
+            } else if (theme.isHonor) {
+                "تحميل حزمة Honor (.hnt)"
+            } else {
+                "تحميل حزمة Huawei (.hwt)"
+            }
+
             NeonGradientButton(
-                text = if (theme.isDownloaded) strings.btnApply else strings.btnDownload,
+                text = downloadBtnText,
                 icon = if (theme.isDownloaded) Icons.Default.FileDownload else Icons.Default.Download,
                 isLoading = isDownloading,
                 onClick = {
                     coroutineScope.launch {
                         isDownloading = true
-                        val file = themeEngineManager.generateHwtPackage(theme)
+                        val file = themeEngineManager.generateThemePackage(theme)
                         onThemeDownloaded(theme.id)
                         isDownloading = false
                         downloadedFile = file

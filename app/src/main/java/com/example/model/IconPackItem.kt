@@ -10,5 +10,7 @@ data class IconPackItem(
     val styleTag: String = "Neon 3D",
     val sampleIcons: List<String> = listOf("phone", "message", "camera", "browser"),
     val glowColorLong: Long = 0xFF8C52FF,
+    val packageFileUri: String? = null,
+    val packageFileUrl: String? = null,
     val isDownloaded: Boolean = false
 )

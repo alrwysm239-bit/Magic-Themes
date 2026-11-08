@@ -140,6 +140,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.updateCustomizerAccentColor(colorLong)
     }
 
+    fun updateCustomizerIconPack(name: String, glowColor: Long) {
+        repository.updateCustomizerIconPack(name, glowColor)
+    }
+
     fun updateCustomizerClockStyle(style: Int) {
         repository.updateCustomizerClockStyle(style)
     }

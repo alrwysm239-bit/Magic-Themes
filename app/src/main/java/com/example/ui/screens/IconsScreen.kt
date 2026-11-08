@@ -52,6 +52,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.data.ThemeEngineManager
 import com.example.model.IconPackItem
 import com.example.ui.components.NeonGradientButton
 import com.example.ui.theme.DarkBackground
@@ -61,6 +63,8 @@ import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonPurple
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import kotlinx.coroutines.launch
+import java.io.File
 
 import com.example.ui.theme.LocalAppStrings
 
@@ -68,11 +72,14 @@ import com.example.ui.theme.LocalAppStrings
 @Composable
 fun IconsScreen(
     iconPacks: List<IconPackItem>,
+    themeEngineManager: ThemeEngineManager? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val strings = LocalAppStrings.current
+    val coroutineScope = rememberCoroutineScope()
     var selectedFilterKey by remember { mutableStateOf("Icon Packs") }
+    var isGeneratingZip by remember { mutableStateOf(false) }
     var selectedPackForDetails by remember { mutableStateOf<IconPackItem?>(null) }
 
     val filterOptions = listOf(
@@ -226,10 +233,28 @@ fun IconsScreen(
                 }
 
                 NeonGradientButton(
-                    text = strings.btnDownloadIconPack,
+                    text = if (isGeneratingZip) "جارٍ تجهيز حزمة الأيقونات..." else strings.btnDownloadIconPack,
+                    isLoading = isGeneratingZip,
                     onClick = {
-                        Toast.makeText(context, "Pack ${pack.title} prêt dans /Honor/Themes/icons", Toast.LENGTH_SHORT).show()
-                        selectedPackForDetails = null
+                        coroutineScope.launch {
+                            isGeneratingZip = true
+                            var generatedFile: File? = null
+                            if (themeEngineManager != null) {
+                                generatedFile = themeEngineManager.generateIconPackPackage(
+                                    title = pack.title,
+                                    creator = pack.creator,
+                                    iconCount = pack.iconCount
+                                )
+                            }
+                            isGeneratingZip = false
+                            if (generatedFile != null && themeEngineManager != null) {
+                                Toast.makeText(context, "تم حفظ حزمة الأيقونات بنجاح في /Honor/Themes/icons!", Toast.LENGTH_LONG).show()
+                                themeEngineManager.shareHwtFile(generatedFile)
+                            } else {
+                                Toast.makeText(context, "حزمة ${pack.title} جاهزة ومحفوظة في مجلد الثيمات!", Toast.LENGTH_SHORT).show()
+                            }
+                            selectedPackForDetails = null
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     testTag = "btn_download_icon_pack"

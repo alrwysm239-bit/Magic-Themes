@@ -61,8 +61,14 @@ class ThemeModel {
   final String description;
   final String compatibleVersions;
   final String hwtStoragePath;
+  final String format; // 'hwt' (Huawei EMUI) or 'hnt' (Honor MagicOS)
   final bool isDownloaded;
   final bool isFavorite;
+
+  bool get isHonor => format.toLowerCase() == 'hnt' || hwtStoragePath.toLowerCase().endsWith('.hnt');
+  bool get isHuawei => format.toLowerCase() == 'hwt' || hwtStoragePath.toLowerCase().endsWith('.hwt');
+  String get platformBadgeText => isHonor ? 'Honor · .hnt' : 'Huawei · .hwt';
+  String get targetDirectory => isHonor ? 'Honor/Themes' : 'Huawei/Themes';
 
   ThemeModel({
     required this.id,
@@ -82,11 +88,13 @@ class ThemeModel {
     this.description = '',
     this.compatibleVersions = 'MagicOS 7/8/9 & EMUI 12/13/14',
     required this.hwtStoragePath,
+    this.format = 'hwt',
     this.isDownloaded = false,
     this.isFavorite = false,
   });
 
   factory ThemeModel.fromMap(Map<String, dynamic> map) {
+    final formatVal = (map['format'] ?? (map['theme_file_url']?.toString().endsWith('.hnt') == true ? 'hnt' : 'hwt')).toString().toLowerCase();
     return ThemeModel(
       id: map['id']?.toString() ?? '',
       title: map['title'] ?? 'Untitled Theme',
@@ -94,17 +102,19 @@ class ThemeModel {
       price: map['price'] ?? 'Gratuit',
       rating: (map['rating'] is num) ? (map['rating'] as num).toDouble() : 5.0,
       reviewsCount: map['reviews_count'] ?? 25,
-      downloadsCount: map['downloads_count'] ?? '12k',
+      downloadsCount: map['downloads_count']?.toString() ?? '12k',
       sizeMb: map['size_mb'] ?? '25 MB',
       isAnimated: map['is_animated'] ?? false,
       isPopular: map['is_popular'] ?? false,
       isEditorsChoice: map['is_editors_choice'] ?? false,
-      categoryId: map['category_id']?.toString() ?? '',
-      previewImageUrl: map['preview_image_url'],
+      categoryId: map['category_id']?.toString() ?? map['category']?.toString() ?? 'all',
+      previewImageUrl: map['preview_url'] ?? map['preview_image_url'],
       lockscreenUrl: map['lockscreen_url'],
-      description: map['description'] ?? 'Thème exclusif MagicOS / EMUI.',
-      compatibleVersions: map['compatible_versions'] ?? 'MagicOS 7/8/9 & EMUI 12/13/14',
-      hwtStoragePath: map['hwt_storage_path'] ?? 'themes/default.hwt',
+      description: map['description'] ?? '',
+      compatibleVersions: map['compatible_versions'] ?? (formatVal == 'hnt' ? 'Honor MagicOS 7/8/9' : 'Huawei EMUI 12/13/14'),
+      hwtStoragePath: map['theme_file_url'] ?? map['hwt_storage_path'] ?? '',
+      format: formatVal,
+      isDownloaded: map['is_downloaded'] ?? false,
       isFavorite: map['is_favorite'] ?? false,
     );
   }
@@ -285,7 +295,7 @@ class SupabaseService {
     }
   }
 
-  // Download .HWT / .HNT theme file from Supabase Storage and save into /Honor/Themes/ or local directory
+  // Download .HWT / .HNT theme file from Supabase Storage and save into /Honor/Themes/ or /Huawei/Themes/
   Future<File> downloadHwtFile({
     required String storagePath,
     required String fileName,
@@ -294,20 +304,31 @@ class SupabaseService {
     // 1. Get signed/public URL from Supabase Storage bucket 'themes'
     final String publicUrl = client.storage.from('themes').getPublicUrl(storagePath);
 
-    // 2. Prepare destination path in /Honor/Themes or App Directory
+    // 2. Prepare destination path in /Honor/Themes (for .hnt) or /Huawei/Themes (for .hwt)
+    final isHnt = fileName.toLowerCase().endsWith('.hnt') || storagePath.toLowerCase().endsWith('.hnt');
+    final ext = isHnt ? '.hnt' : '.hwt';
+    final targetFolder = isHnt ? 'Honor/Themes' : 'Huawei/Themes';
+
     Directory baseDir;
-    try {
-      final extDir = await getExternalStorageDirectory();
-      final honorDir = Directory('${extDir?.path}/Honor/Themes');
-      if (!await honorDir.exists()) {
-        await honorDir.create(recursive: true);
+    final nativePath = Directory('/storage/emulated/0/$targetFolder');
+    if (await nativePath.exists()) {
+      baseDir = nativePath;
+    } else {
+      try {
+        await nativePath.create(recursive: true);
+        baseDir = nativePath;
+      } catch (_) {
+        final extDir = await getExternalStorageDirectory();
+        final fallbackDir = Directory('${extDir?.path}/$targetFolder');
+        if (!await fallbackDir.exists()) {
+          await fallbackDir.create(recursive: true);
+        }
+        baseDir = fallbackDir;
       }
-      baseDir = honorDir;
-    } catch (_) {
-      baseDir = await getApplicationDocumentsDirectory();
     }
 
-    final safeFileName = (fileName.endsWith('.hwt') || fileName.endsWith('.hnt')) ? fileName : '$fileName.hwt';
+    final rawTitle = fileName.replaceAll(RegExp(r'\.(hwt|hnt)$', caseSensitive: false), '');
+    final safeFileName = '$rawTitle$ext';
     final targetFile = File('${baseDir.path}/$safeFileName');
 
     // 3. Real HTTP download with progress tracking
@@ -397,6 +418,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
   String _selectedCategory = 'الكل';
+  String _platformFilter = 'ALL'; // 'ALL', 'HUAWEI', 'HONOR'
   final List<String> _categories = ['الكل', 'Cyberpunk', 'Neon AMOLED', 'Minimal', 'Honor Magic', 'Huawei EMUI'];
 
   late Future<List<ThemeModel>> _themesFuture;
@@ -420,6 +442,11 @@ class _HomeScreenState extends State<HomeScreen> {
       var query = _supabase.from('themes').select();
       if (_selectedCategory != 'الكل') {
         query = query.eq('category', _selectedCategory);
+      }
+      if (_platformFilter == 'HUAWEI') {
+        query = query.eq('format', 'hwt');
+      } else if (_platformFilter == 'HONOR') {
+        query = query.eq('format', 'hnt');
       }
       final response = await query.order('created_at', ascending: false);
       return (response as List).map((map) => ThemeModel.fromMap(map)).toList();
@@ -521,6 +548,19 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
 
               const SizedBox(height: 20),
+
+              // Dual-Platform Filter Bar (All / Huawei .hwt / Honor .hnt)
+              Row(
+                children: [
+                  _buildPlatformChip('ALL', 'الكل (All)', AppColors.neonPurple),
+                  const SizedBox(width: 8),
+                  _buildPlatformChip('HUAWEI', 'Huawei (.hwt)', const Color(0xFFFF5252)),
+                  const SizedBox(width: 8),
+                  _buildPlatformChip('HONOR', 'Honor (.hnt)', AppColors.neonCyan),
+                ],
+              ),
+
+              const SizedBox(height: 14),
 
               // Categories Filter Chips
               SizedBox(
@@ -651,6 +691,54 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildPlatformChip(String key, String label, Color accentColor) {
+    final isSelected = _platformFilter == key;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _platformFilter = key;
+            _themesFuture = _fetchThemesFromSupabase();
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? accentColor.withOpacity(0.22) : const Color(0xFF141028),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? accentColor : const Color(0x338C52FF),
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          alignment: Alignment.Center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected ? accentColor : Colors.white38,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white60,
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPopularCard(ThemeModel theme) {
     return GestureDetector(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ThemeDetailsScreen(theme: theme))),
@@ -667,15 +755,43 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-                child: theme.previewImageUrl != null && theme.previewImageUrl!.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: theme.previewImageUrl!,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        placeholder: (_, __) => Container(color: const Color(0xFF1B1736)),
-                        errorWidget: (_, __) => Container(color: const Color(0xFF1B1736), child: const Icon(Icons.broken_image, color: Colors.white24)),
-                      )
-                    : Container(color: const Color(0xFF1B1736), child: const Icon(Icons.style, color: Colors.white24)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    theme.previewImageUrl != null && theme.previewImageUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: theme.previewImageUrl!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            placeholder: (_, __) => Container(color: const Color(0xFF1B1736)),
+                            errorWidget: (_, __) => Container(color: const Color(0xFF1B1736), child: const Icon(Icons.broken_image, color: Colors.white24)),
+                          )
+                        : Container(color: const Color(0xFF1B1736), child: const Icon(Icons.style, color: Colors.white24)),
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xCC000000),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: theme.isHonor ? AppColors.neonCyan : const Color(0xFFFF5252),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          theme.platformBadgeText,
+                          style: TextStyle(
+                            color: theme.isHonor ? AppColors.neonCyan : const Color(0xFFFF7070),
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             Padding(
@@ -688,7 +804,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(theme.compatibleVersions.contains('Honor') ? '.HNT' : '.HWT', style: const TextStyle(color: AppColors.neonCyan, fontSize: 10, fontWeight: FontWeight.bold)),
+                      Text(theme.platformBadgeText, style: TextStyle(color: theme.isHonor ? AppColors.neonCyan : const Color(0xFFFF7070), fontSize: 10, fontWeight: FontWeight.bold)),
                       Row(
                         children: [
                           const Icon(Icons.star, color: AppColors.neonAmber, size: 12),

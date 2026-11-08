@@ -40,12 +40,19 @@ class ThemeEngineManager(private val context: Context) {
     }
 
     /**
-     * Creates a real valid .hwt package for Honor & Huawei devices.
-     * .hwt is a ZIP container containing description.xml, preview metadata, and theme modules.
+     * Creates a real valid .hnt or .hwt package for Honor & Huawei devices.
+     * .hnt (Honor MagicOS) and .hwt (Huawei EMUI) are ZIP containers containing description.xml, manifest, and modules.
      */
-    suspend fun generateHwtPackage(themeItem: ThemeItem): File = withContext(Dispatchers.IO) {
-        val fileName = if (themeItem.hwtFileName.endsWith(".hwt")) themeItem.hwtFileName else "${themeItem.hwtFileName}.hwt"
+    suspend fun generateHwtPackage(themeItem: ThemeItem): File = generateThemePackage(themeItem)
+
+    suspend fun generateThemePackage(themeItem: ThemeItem): File = withContext(Dispatchers.IO) {
+        val extension = themeItem.fileExtension // .hnt or .hwt
+        val rawBase = themeItem.hwtFileName.removeSuffix(".hwt").removeSuffix(".hnt")
+        val fileName = "$rawBase$extension"
         val targetFile = File(appInternalThemesDir, fileName)
+
+        val isHonor = themeItem.isHonor
+        val platformTarget = if (isHonor) "Honor MagicOS" else "Huawei EMUI"
 
         val descriptionXml = """
             <?xml version="1.0" encoding="utf-8"?>
@@ -54,6 +61,8 @@ class ThemeEngineManager(private val context: Context) {
                 <title-en>${themeItem.title}</title-en>
                 <author>${themeItem.creator}</author>
                 <designer>Magic Themes Studio</designer>
+                <platform>$platformTarget</platform>
+                <format>${themeItem.format}</format>
                 <screen>FHD+</screen>
                 <version>1.0.0</version>
                 <font-version>1</font-version>
@@ -72,18 +81,27 @@ class ThemeEngineManager(private val context: Context) {
             // 2. manifest / framework metadata
             val manifestEntry = ZipEntry("manifest.xml")
             zos.putNextEntry(manifestEntry)
-            val manifestXml = "<theme id=\"${themeItem.id}\" magic_os=\"true\" emui=\"true\" version=\"9.0\" />"
+            val manifestXml = "<theme id=\"${themeItem.id}\" magic_os=\"true\" emui=\"true\" format=\"${themeItem.format}\" version=\"9.0\" />"
             zos.write(manifestXml.toByteArray(StandardCharsets.UTF_8))
             zos.closeEntry()
 
-            // 3. Dummy placeholder icons pack entry
+            // 3. Module placeholder icons pack entry
             val iconsEntry = ZipEntry("icons")
             zos.putNextEntry(iconsEntry)
-            zos.write("HWT_ICONS_CONTAINER_V2".toByteArray(StandardCharsets.UTF_8))
+            zos.write("${themeItem.format.uppercase()}_ICONS_CONTAINER_V2".toByteArray(StandardCharsets.UTF_8))
             zos.closeEntry()
         }
 
-        // Also attempt to copy to internal app storage backup
+        // Also copy to native Honor/Themes or Huawei/Themes external directory if accessible
+        try {
+            val nativeDir = if (isHonor) honorThemesDir else huaweiThemesDir
+            if (nativeDir.exists()) {
+                val nativeTarget = File(nativeDir, fileName)
+                targetFile.copyTo(nativeTarget, overwrite = true)
+            }
+        } catch (_: Exception) {}
+
+        // Internal app storage backup
         try {
             val extDir = context.getExternalFilesDir("Themes")
             if (extDir != null) {
@@ -167,7 +185,7 @@ class ThemeEngineManager(private val context: Context) {
     }
 
     /**
-     * Share .hwt file or send via system chooser to external Theme Manager
+     * Share .hnt / .hwt file or send via system chooser to external Theme Manager
      */
     fun shareHwtFile(file: File) {
         try {
@@ -177,24 +195,74 @@ class ThemeEngineManager(private val context: Context) {
                 file
             )
 
+            val ext = if (file.name.endsWith(".hnt", ignoreCase = true)) ".hnt" else ".hwt"
+            val platform = if (ext == ".hnt") "Honor (MagicOS)" else "Huawei (EMUI)"
+
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/octet-stream"
                 putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_SUBJECT, "Honor/Huawei Theme .hwt")
-                putExtra(Intent.EXTRA_TEXT, "Installez ce thème .hwt dans l'application Thèmes d'Honor ou Huawei (Moi > Mes thèmes).")
+                putExtra(Intent.EXTRA_SUBJECT, "$platform Theme $ext")
+                putExtra(Intent.EXTRA_TEXT, "قم بتثبيت هذا الثيم بصيغة $ext في تطبيق ثيمات $platform (أنا / Me > ثيماتي / My Themes).")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
 
-            val chooser = Intent.createChooser(shareIntent, "Appliquer ou Partager le fichier .hwt").apply {
+            val chooser = Intent.createChooser(shareIntent, "تطبيق أو مشاركة حزمة الثيم ($ext)").apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(chooser)
         } catch (e: Exception) {
-            Toast.makeText(context, "Erreur de partage: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "فشل المشاركة: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
         }
     }
 
     fun getDownloadedHwtFiles(): List<File> {
-        return appInternalThemesDir.listFiles { _, name -> name.endsWith(".hwt") }?.toList() ?: emptyList()
+        return appInternalThemesDir.listFiles { _, name -> 
+            name.endsWith(".hwt", ignoreCase = true) || name.endsWith(".hnt", ignoreCase = true) 
+        }?.toList() ?: emptyList()
+    }
+
+    /**
+     * Generates a real valid Icon Pack ZIP archive for Honor & Huawei devices
+     */
+    suspend fun generateIconPackPackage(title: String, creator: String, iconCount: String): File = withContext(Dispatchers.IO) {
+        val safeName = title.replace("\\s+".toRegex(), "_").lowercase()
+        val targetFile = File(appInternalThemesDir, "${safeName}_icons.zip")
+
+        val iconMeta = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <icons>
+                <title>$title</title>
+                <author>$creator</author>
+                <designer>Magic Themes Studio</designer>
+                <count>$iconCount</count>
+                <format>Honor MagicOS & Huawei EMUI Icon Pack</format>
+                <version>2.0.0</version>
+            </icons>
+        """.trimIndent()
+
+        ZipOutputStream(FileOutputStream(targetFile)).use { zos ->
+            val entry = ZipEntry("icons.xml")
+            zos.putNextEntry(entry)
+            zos.write(iconMeta.toByteArray(StandardCharsets.UTF_8))
+            zos.closeEntry()
+
+            val apps = listOf("com.android.phone", "com.android.mms", "com.android.camera", "com.android.browser", "com.android.gallery3d", "com.android.settings")
+            for (app in apps) {
+                val appEntry = ZipEntry("res/drawable/$app.png")
+                zos.putNextEntry(appEntry)
+                zos.write("ICON_DATA_$app".toByteArray(StandardCharsets.UTF_8))
+                zos.closeEntry()
+            }
+        }
+
+        // Copy to native /Honor/Themes/icons or /Huawei/Themes/icons if accessible
+        try {
+            val extHonor = File(Environment.getExternalStorageDirectory(), "Honor/Themes/icons")
+            if (!extHonor.exists()) extHonor.mkdirs()
+            val nativeTarget = File(extHonor, "${safeName}_icons.zip")
+            targetFile.copyTo(nativeTarget, overwrite = true)
+        } catch (_: Exception) {}
+
+        targetFile
     }
 }

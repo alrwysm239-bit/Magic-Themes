@@ -1265,8 +1265,9 @@ fun MenuScreen(
                                                 previewDrawableRes = R.drawable.wallpaper_cyberpunk,
                                                 previewGradientColors = listOf(0xFF8C52FF, 0xFF00D2FF),
                                                 description = newThemeDesc.ifBlank { "ثيم حصري عالي الجودة متوافق مع MagicOS و EMUI" },
-                                                compatibleVersions = if (selectedFormat == "hnt") "MagicOS 7.0 / 8.0+" else "EMUI 12 / 13 / 14",
-                                                hwtFileName = "${cleanTitle.lowercase().replace(" ", "_")}.$selectedFormat"
+                                                compatibleVersions = if (selectedFormat == "hnt") "Honor MagicOS 7.0 / 8.0+" else "Huawei EMUI 12 / 13 / 14",
+                                                hwtFileName = "${cleanTitle.lowercase().replace(" ", "_")}.$selectedFormat",
+                                                format = selectedFormat
                                             )
                                             onAddTheme(createdTheme)
                                             uploadFeedbackMessage = "تم نشر الثيم ($cleanTitle.$selectedFormat) وحفظه في السحابة بنجاح!"
@@ -1301,7 +1302,7 @@ fun MenuScreen(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(theme.title, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text("ملف: ${theme.hwtFileName} · تحميلات: ${theme.downloadsCount}", color = NeonCyan, fontSize = 10.sp)
+                                        Text("ملف: ${theme.hwtFileName} · المنصة: ${if (theme.isHonor) "Honor (.hnt)" else "Huawei (.hwt)"}", color = if (theme.isHonor) NeonCyan else Color(0xFFFF7070), fontSize = 10.sp)
                                     }
                                     IconButton(
                                         onClick = {
@@ -1431,7 +1432,8 @@ fun MenuScreen(
                                                 id = newId,
                                                 title = cleanTitle,
                                                 category = selectedWallpaperCategory,
-                                                drawableRes = R.drawable.wallpaper_galaxy,
+                                                drawableRes = if (newWallpaperDirectUrl.isBlank()) R.drawable.wallpaper_galaxy else null,
+                                                imageUrl = newWallpaperDirectUrl.trim().ifBlank { null },
                                                 gradientColors = listOf(0xFF0F172A, 0xFF38BDF8),
                                                 downloadsCount = "1",
                                                 isLive = selectedWallpaperCategory.contains("Live", ignoreCase = true)
@@ -1591,6 +1593,7 @@ fun MenuScreen(
                                                 creator = newIconDeveloper.ifBlank { "Magic Studio" },
                                                 iconCount = newIconCount.ifBlank { "1600+ أيقونة" },
                                                 styleTag = newIconCategory,
+                                                packageFileUrl = newIconDirectUrl.trim().ifBlank { null },
                                                 glowColorLong = 0xFF8C52FF
                                             )
                                             onAddIconPack(createdIcon)

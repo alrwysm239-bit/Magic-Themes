@@ -220,6 +220,29 @@ fun WallpapersScreen(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
+                    } else if (!wallpaper.imageUri.isNullOrBlank()) {
+                        coil.compose.AsyncImage(
+                            model = wallpaper.imageUri,
+                            contentDescription = wallpaper.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else if (!wallpaper.imageUrl.isNullOrBlank()) {
+                        coil.compose.AsyncImage(
+                            model = wallpaper.imageUrl,
+                            contentDescription = wallpaper.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Brush.verticalGradient(wallpaper.gradientColors.map { Color(it) })),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Wallpaper, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(48.dp))
+                        }
                     }
                 }
 
@@ -236,6 +259,42 @@ fun WallpapersScreen(
                     fontSize = 12.sp
                 )
 
+                // Wallpaper Target Selection: Home Screen / Lock Screen / Both
+                var selectedTargetMode by remember { mutableStateOf(1) } // 1: Home, 2: Lock, 3: Both
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF141128))
+                        .border(1.dp, Color(0x338C52FF), RoundedCornerShape(14.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(
+                        1 to strings.applyHomeOnly,
+                        2 to strings.applyLockOnly,
+                        3 to strings.applyBothScreens
+                    ).forEach { (mode, label) ->
+                        val isSelected = selectedTargetMode == mode
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSelected) NeonPurple else Color.Transparent)
+                                .clickable { selectedTargetMode = mode }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) Color.White else TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -247,17 +306,67 @@ fun WallpapersScreen(
                         onClick = {
                             coroutineScope.launch {
                                 isApplying = true
+                                var applySuccess = false
                                 withContext(Dispatchers.IO) {
                                     try {
+                                        val wm = WallpaperManager.getInstance(context)
+                                        var bitmap: android.graphics.Bitmap? = null
+
+                                        // 1. Try decoding drawable resource
                                         if (wallpaper.drawableRes != null) {
-                                            val wm = WallpaperManager.getInstance(context)
-                                            val bitmap = BitmapFactory.decodeResource(context.resources, wallpaper.drawableRes)
-                                            wm.setBitmap(bitmap)
+                                            bitmap = BitmapFactory.decodeResource(context.resources, wallpaper.drawableRes)
                                         }
-                                    } catch (_: Exception) {}
+
+                                        // 2. Try decoding imageUri if available
+                                        if (bitmap == null && !wallpaper.imageUri.isNullOrBlank()) {
+                                            try {
+                                                val uri = android.net.Uri.parse(wallpaper.imageUri)
+                                                context.contentResolver.openInputStream(uri)?.use { stream ->
+                                                    bitmap = BitmapFactory.decodeStream(stream)
+                                                }
+                                            } catch (_: Exception) {}
+                                        }
+
+                                        // 3. Fallback: generate high-res gradient bitmap
+                                        if (bitmap == null) {
+                                            val w = 1080
+                                            val h = 1920
+                                            val bm = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                                            val canvas = android.graphics.Canvas(bm)
+                                            val paint = android.graphics.Paint()
+                                            val colors = wallpaper.gradientColors.map { it.toInt() }.toIntArray()
+                                            val shader = android.graphics.LinearGradient(
+                                                0f, 0f, 0f, h.toFloat(),
+                                                colors, null, android.graphics.Shader.TileMode.CLAMP
+                                            )
+                                            paint.shader = shader
+                                            canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+                                            bitmap = bm
+                                        }
+
+                                        if (bitmap != null) {
+                                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                                                val whichFlag = when (selectedTargetMode) {
+                                                    1 -> WallpaperManager.FLAG_SYSTEM // Home screen
+                                                    2 -> WallpaperManager.FLAG_LOCK   // Lock screen
+                                                    else -> WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK // Both
+                                                }
+                                                wm.setBitmap(bitmap, null, true, whichFlag)
+                                            } else {
+                                                wm.setBitmap(bitmap)
+                                            }
+                                            applySuccess = true
+                                        }
+                                    } catch (e: Exception) {
+                                        applySuccess = false
+                                    }
                                 }
                                 isApplying = false
-                                Toast.makeText(context, strings.wallpaperAppliedSuccess, Toast.LENGTH_SHORT).show()
+                                if (applySuccess) {
+                                    Toast.makeText(context, strings.wallpaperAppliedSuccess, Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "تعذر تعيين الخلفية مباشرة. يرجى التحقق من أذونات النظام.", Toast.LENGTH_SHORT).show()
+                                }
                                 selectedWallpaperForPreview = null
                             }
                         },
@@ -314,6 +423,20 @@ fun WallpaperGridCard(
         if (wallpaper.drawableRes != null) {
             Image(
                 painter = painterResource(id = wallpaper.drawableRes),
+                contentDescription = wallpaper.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else if (!wallpaper.imageUri.isNullOrBlank()) {
+            coil.compose.AsyncImage(
+                model = wallpaper.imageUri,
+                contentDescription = wallpaper.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else if (!wallpaper.imageUrl.isNullOrBlank()) {
+            coil.compose.AsyncImage(
+                model = wallpaper.imageUrl,
                 contentDescription = wallpaper.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

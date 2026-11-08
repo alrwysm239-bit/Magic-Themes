@@ -477,6 +477,7 @@ fun MemberUploadDialog(
                                     description = description.ifBlank { "تم استيراد هذا الثيم مباشرة عبر مدير الملفات لهواتف هونر وهواوي." },
                                     compatibleVersions = if (selectedFormat == "hnt") "Honor MagicOS 7/8/9 Edition" else "Huawei EMUI 12/13/14 Edition",
                                     hwtFileName = pickedFileName ?: "imported_theme.${selectedFormat}",
+                                    format = selectedFormat,
                                     previewGradientColors = listOf(0xFF8C52FF, 0xFF00D2FF)
                                 )
                                 onAddTheme(newTheme)
@@ -487,6 +488,7 @@ fun MemberUploadDialog(
                                     id = "imported_wall_${UUID.randomUUID()}",
                                     title = title,
                                     category = wallpaperCategory,
+                                    imageUri = pickedFileUri?.toString(),
                                     downloadsCount = "1",
                                     isLive = wallpaperCategory == "Live Wallpapers",
                                     isFavorite = false,
@@ -503,6 +505,7 @@ fun MemberUploadDialog(
                                     rating = 5.0f,
                                     iconCount = iconCount,
                                     styleTag = iconStyleTag,
+                                    packageFileUri = pickedFileUri?.toString(),
                                     glowColorLong = 0xFF8C52FF,
                                     isDownloaded = false
                                 )

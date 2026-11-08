@@ -204,7 +204,8 @@ fun ThemeStoreApp(
 
                                     NavTab.ICONS -> {
                                         IconsScreen(
-                                            iconPacks = iconPacks
+                                            iconPacks = iconPacks,
+                                            themeEngineManager = viewModel.themeEngineManager
                                         )
                                     }
 
@@ -220,6 +221,9 @@ fun ThemeStoreApp(
                                             },
                                             onClockStyleSelected = { style ->
                                                 viewModel.updateCustomizerClockStyle(style)
+                                            },
+                                            onIconPackSelected = { name, color ->
+                                                viewModel.updateCustomizerIconPack(name, color)
                                             },
                                             onTogglePreviewMode = {
                                                 viewModel.toggleCustomizerPreviewMode()

@@ -83,15 +83,29 @@ class ThemeDownloadService {
       }
     }
 
-    // 3. Prepare target destination file in /storage/emulated/0/Download/ThemeStore
-    final dir = await _getThemeStoreDownloadDirectory();
-    final sanitizedTitle = themeTitle.replaceAll(RegExp(r'[^\w\s\.-]'), '_').trim();
-    final isHnt = hwtStoragePath.toLowerCase().endsWith('.hnt');
+    // 3. Prepare target destination file in /Honor/Themes/ or /Huawei/Themes/
+    final isHnt = hwtStoragePath.toLowerCase().endsWith('.hnt') || themeTitle.toLowerCase().contains('honor');
     final ext = isHnt ? '.hnt' : '.hwt';
+    final targetSubFolder = isHnt ? 'Honor/Themes' : 'Huawei/Themes';
+
+    Directory targetDir;
+    final nativePlatformDir = Directory('/storage/emulated/0/$targetSubFolder');
+    if (await nativePlatformDir.exists()) {
+      targetDir = nativePlatformDir;
+    } else {
+      try {
+        await nativePlatformDir.create(recursive: true);
+        targetDir = nativePlatformDir;
+      } catch (_) {
+        targetDir = await _getThemeStoreDownloadDirectory();
+      }
+    }
+
+    final sanitizedTitle = themeTitle.replaceAll(RegExp(r'[^\w\s\.-]'), '_').trim();
     final fileName = sanitizedTitle.toLowerCase().endsWith('.hwt') || sanitizedTitle.toLowerCase().endsWith('.hnt')
         ? sanitizedTitle
         : '$sanitizedTitle$ext';
-    final targetFile = File('${dir.path}/$fileName');
+    final targetFile = File('${targetDir.path}/$fileName');
 
     // Remove old partially downloaded file if exists
     if (await targetFile.exists()) {

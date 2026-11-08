@@ -68,6 +68,12 @@ import com.example.ui.theme.TextSecondary
 
 import com.example.ui.theme.LocalAppStrings
 
+enum class PlatformFilter {
+    ALL,
+    HUAWEI,
+    HONOR
+}
+
 @Composable
 fun HomeScreen(
     themes: List<ThemeItem>,
@@ -81,16 +87,22 @@ fun HomeScreen(
 ) {
     val strings = LocalAppStrings.current
     var selectedFilter by remember { mutableStateOf(HeaderFilter.FEATURED) }
+    var selectedPlatformFilter by remember { mutableStateOf(PlatformFilter.ALL) }
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    val filteredThemes = remember(themes, selectedFilter, searchQuery) {
+    val filteredThemes = remember(themes, selectedFilter, selectedPlatformFilter, searchQuery) {
         val base = when (selectedFilter) {
             HeaderFilter.FEATURED -> themes.filter { it.isEditorsChoice || it.isPopular }
             HeaderFilter.TOP -> themes.sortedByDescending { it.rating }
         }
-        if (searchQuery.isBlank()) base
-        else base.filter { it.title.contains(searchQuery, ignoreCase = true) || it.creator.contains(searchQuery, ignoreCase = true) }
+        val platformFiltered = when (selectedPlatformFilter) {
+            PlatformFilter.ALL -> base
+            PlatformFilter.HUAWEI -> base.filter { it.isHuawei }
+            PlatformFilter.HONOR -> base.filter { it.isHonor }
+        }
+        if (searchQuery.isBlank()) platformFiltered
+        else platformFiltered.filter { it.title.contains(searchQuery, ignoreCase = true) || it.creator.contains(searchQuery, ignoreCase = true) }
     }
 
     LazyColumn(
@@ -146,6 +158,67 @@ fun HomeScreen(
                         shape = RoundedCornerShape(20.dp),
                         singleLine = true
                     )
+                }
+            }
+        }
+
+        // Dual Platform Filter Bar: All, Huawei (.hwt), Honor (.hnt)
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf(
+                    PlatformFilter.ALL to "الكل (All)",
+                    PlatformFilter.HUAWEI to "Huawei (.hwt)",
+                    PlatformFilter.HONOR to "Honor (.hnt)"
+                ).forEach { (filterType, label) ->
+                    val isSelected = selectedPlatformFilter == filterType
+                    val activeColor = when (filterType) {
+                        PlatformFilter.ALL -> NeonPurple
+                        PlatformFilter.HUAWEI -> Color(0xFFFF5252)
+                        PlatformFilter.HONOR -> NeonCyan
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (isSelected) activeColor.copy(alpha = 0.22f)
+                                else Color(0xFF141028)
+                            )
+                            .border(
+                                width = if (isSelected) 1.5.dp else 1.dp,
+                                color = if (isSelected) activeColor else Color(0x338C52FF),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .clickable { selectedPlatformFilter = filterType }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) activeColor else Color.White.copy(alpha = 0.4f))
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = label,
+                                color = if (isSelected) Color.White else TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -397,6 +470,29 @@ fun ThemePreviewCard(
                         )
                     )
             )
+
+            // Platform format badge (Honor .hnt / Huawei .hwt)
+            val isHonor = theme.isHonor
+            val badgeColor = if (isHonor) NeonCyan else Color(0xFFFF6565)
+            val badgeBg = if (isHonor) Color(0xD9081C2E) else Color(0xD92E0D12)
+            val badgeLabel = if (isHonor) "Honor · .hnt" else "Huawei · .hwt"
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(7.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(badgeBg)
+                    .border(1.dp, badgeColor.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = badgeLabel,
+                    color = badgeColor,
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
             // Animated badge if present
             if (theme.isAnimated) {

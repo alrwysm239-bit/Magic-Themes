@@ -391,6 +391,9 @@ class ThemeItem {
 
   String get fileExtension => format == ThemeFormat.hnt ? '.hnt' : '.hwt';
   String get targetFolderName => format == ThemeFormat.hnt ? 'Honor/Themes' : 'Huawei/Themes';
+  bool get isHonor => format == ThemeFormat.hnt;
+  bool get isHuawei => format == ThemeFormat.hwt;
+  String get platformBadgeText => isHonor ? 'Honor · .hnt' : 'Huawei · .hwt';
 }
 ```
 

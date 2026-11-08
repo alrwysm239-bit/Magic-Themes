@@ -87,6 +87,7 @@ fun CustomizerScreen(
     onWallpaperSelected: (Int?, String) -> Unit,
     onAccentColorSelected: (Long) -> Unit,
     onClockStyleSelected: (Int) -> Unit,
+    onIconPackSelected: (String, Long) -> Unit = { _, _ -> },
     onTogglePreviewMode: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -338,23 +339,34 @@ fun CustomizerScreen(
 
             3 -> {
                 // Icons style
+                val iconStyles = listOf(
+                    "Néon 3D Glass" to 0xFF8C52FF,
+                    "Pastel Soft" to 0xFFFF2A85,
+                    "Cyber Minimal" to 0xFF00D2FF
+                )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.padding(horizontal = 20.dp)
                 ) {
-                    listOf("Néon 3D Glass", "Pastel Soft", "Cyber Minimal").forEach { style ->
+                    iconStyles.forEach { (style, color) ->
+                        val isSelected = customizerState.selectedIconPackName == style
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF1E193C))
-                                .border(1.dp, Color(customizerState.accentColorLong), RoundedCornerShape(16.dp))
+                                .background(if (isSelected) Color(color).copy(alpha = 0.25f) else Color(0xFF1E193C))
+                                .border(
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) Color(color) else Color(0x33FFFFFF),
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                                .clickable { onIconPackSelected(style, color) }
                                 .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Text(
                                 text = style,
-                                color = Color.White,
+                                color = if (isSelected) Color.White else TextSecondary,
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
                             )
                         }
                     }

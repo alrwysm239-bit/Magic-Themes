@@ -133,6 +133,45 @@ class ThemeRepository {
                 compatibleVersions = "MagicOS 7/8/9 & EMUI 11/12/13/14",
                 hwtFileName = "noir_pure_amoled.hwt",
                 isDownloaded = true
+            ),
+            ThemeItem(
+                id = "theme_honor_magic_falcon",
+                title = "[Honor] MagicOS 8 Falcon",
+                creator = "Honor Studio Pro",
+                price = "Gratuit",
+                rating = 5.0f,
+                reviewsCount = 420,
+                downloadsCount = "92k",
+                sizeMb = "31.2 MB",
+                isAnimated = true,
+                isPopular = true,
+                isEditorsChoice = true,
+                category = "Cyberpunk",
+                previewDrawableRes = R.drawable.wallpaper_cyberpunk,
+                previewGradientColors = listOf(0xFF00D2FF, 0xFF8C52FF),
+                description = "ثيم رسمي مخصص لهواتف هونر MagicOS مع شاشة قفل تفاعلية ثلاثية الأبعاد وحزمة أيقونات فخمة بصيغة .hnt الأصلية.",
+                compatibleVersions = "Honor MagicOS 7.0 / 8.0 / 9.0",
+                hwtFileName = "honor_magic_falcon.hnt",
+                format = "hnt"
+            ),
+            ThemeItem(
+                id = "theme_honor_cyber_matrix",
+                title = "[Honor] Cyber Matrix Pro",
+                creator = "Honor Lab",
+                price = "MAD 20,00",
+                rating = 4.9f,
+                reviewsCount = 98,
+                downloadsCount = "54k",
+                sizeMb = "26.8 MB",
+                isAnimated = true,
+                isPopular = true,
+                category = "Gaming",
+                previewDrawableRes = R.drawable.wallpaper_anime,
+                previewGradientColors = listOf(0xFF059669, 0xFF00D2FF),
+                description = "تصميم مصفوفة رقمية خضراء وسيبرانية مخصصة لأجهزة Honor Magic 5/6/7 Pro بصيغة .hnt الأصلية.",
+                compatibleVersions = "Honor MagicOS 8.0 / 8.1+",
+                hwtFileName = "honor_cyber_matrix.hnt",
+                format = "hnt"
             )
         )
 
