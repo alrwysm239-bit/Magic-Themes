@@ -441,8 +441,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   final _themePreviewUrlController = TextEditingController();
   String _selectedThemeCategory = 'Cyberpunk';
   String _selectedFormat = 'hwt'; // 'hwt' or 'hnt'
-  int _themeUploadOption = 0; // 0: Option A (Pick file), 1: Option B (Direct URL)
-  int _themePreviewOption = 0; // 0: Option A (Pick image), 1: Option B (Direct URL)
+  String _themeUploadOption = 'file'; // 'file' (Option A: Pick from storage), 'url' (Option B: Direct URL)
+  String _themePreviewOption = 'file'; // 'file' (Option A: Pick from storage), 'url' (Option B: Direct URL)
   File? _pickedThemeImage;
   File? _pickedThemeFile;
   List<Map<String, dynamic>> _themesList = [];
@@ -454,7 +454,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   final _wallpaperTagsController = TextEditingController(text: 'AMOLED, Neon, MagicOS');
   final _wallpaperUrlController = TextEditingController();
   String _selectedWallpaperCategory = 'Live Wallpapers'; // 'Live Wallpapers', 'Wallpapers', 'Art/Design'
-  int _wallpaperUploadOption = 0; // 0: Pick image, 1: Direct URL
+  String _wallpaperUploadOption = 'file'; // 'file' (Option A: Pick from storage), 'url' (Option B: Direct URL)
   File? _pickedWallpaperFile;
   List<Map<String, dynamic>> _wallpapersList = [];
 
@@ -466,7 +466,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   final _iconCountController = TextEditingController(text: '1600+ أيقونة');
   final _iconFileUrlController = TextEditingController();
   final _iconPreviewUrlController = TextEditingController();
-  int _iconUploadOption = 0; // 0: Pick archive, 1: Direct URL
+  String _iconUploadOption = 'file'; // 'file' (Option A: Pick from storage), 'url' (Option B: Direct URL)
   File? _pickedIconFile;
   File? _pickedIconPreview;
   List<Map<String, dynamic>> _iconsList = [];
@@ -567,25 +567,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   }
 
   // --- 1. Theme Upload (Dual Options: Device File / Direct URL) ---
+  // Helper to extract relative storage path from a Supabase public URL
+  String? _extractPathFromUrl(String? url, String bucket) {
+    if (url == null || url.isEmpty) return null;
+    final marker = '/$bucket/';
+    final idx = url.indexOf(marker);
+    if (idx != -1) {
+      return Uri.decodeComponent(url.substring(idx + marker.length).split('?').first);
+    }
+    return null;
+  }
+
+  // --- 1. Theme Upload (Dual Options: Device File / Direct URL) ---
   Future<void> _uploadTheme() async {
     if (!_themeFormKey.currentState!.validate()) return;
 
     // Validate preview source
-    if (_themePreviewOption == 0 && _pickedThemeImage == null) {
+    if (_themePreviewOption == 'file' && _pickedThemeImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار صورة المعاينة من الجهاز')));
       return;
     }
-    if (_themePreviewOption == 1 && _themePreviewUrlController.text.trim().isEmpty) {
+    if (_themePreviewOption == 'url' && _themePreviewUrlController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إدخال رابط صورة المعاينة المباشر')));
       return;
     }
 
     // Validate file source
-    if (_themeUploadOption == 0 && _pickedThemeFile == null) {
+    if (_themeUploadOption == 'file' && _pickedThemeFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار ملف الثيم (.hwt/.hnt) من الجهاز')));
       return;
     }
-    if (_themeUploadOption == 1 && _themeFileUrlController.text.trim().isEmpty) {
+    if (_themeUploadOption == 'url' && _themeFileUrlController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إدخال رابط ملف الثيم المباشر')));
       return;
     }
@@ -599,20 +611,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       String sizeMb = '25.0 MB';
 
       // 1. Preview Image (Option A: Storage Upload, Option B: Direct URL)
-      if (_themePreviewOption == 0 && _pickedThemeImage != null) {
+      if (_themePreviewOption == 'file' && _pickedThemeImage != null) {
         final prevExt = _pickedThemeImage!.path.split('.').last;
         final prevPath = 'previews/$ts.$prevExt';
-        await _supabase.storage.from('previews').upload(prevPath, _pickedThemeImage!);
+        await _supabase.storage.from('previews').upload(
+          prevPath,
+          _pickedThemeImage!,
+          fileOptions: const FileOptions(upsert: true),
+        );
         prevUrl = _supabase.storage.from('previews').getPublicUrl(prevPath);
       } else {
         prevUrl = _themePreviewUrlController.text.trim();
       }
 
       // 2. Theme File (Option A: Storage Upload, Option B: Direct URL)
-      if (_themeUploadOption == 0 && _pickedThemeFile != null) {
+      if (_themeUploadOption == 'file' && _pickedThemeFile != null) {
         final fileExt = _selectedFormat;
         final filePath = 'themes/$ts.$fileExt';
-        await _supabase.storage.from('themes').upload(filePath, _pickedThemeFile!);
+        await _supabase.storage.from('themes').upload(
+          filePath,
+          _pickedThemeFile!,
+          fileOptions: const FileOptions(upsert: true),
+        );
         fileUrl = _supabase.storage.from('themes').getPublicUrl(filePath);
         sizeMb = '${(_pickedThemeFile!.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB';
       } else {
@@ -656,11 +676,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   Future<void> _uploadWallpaper() async {
     if (!_wallpaperFormKey.currentState!.validate()) return;
 
-    if (_wallpaperUploadOption == 0 && _pickedWallpaperFile == null) {
+    if (_wallpaperUploadOption == 'file' && _pickedWallpaperFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار صورة الخلفية من الجهاز')));
       return;
     }
-    if (_wallpaperUploadOption == 1 && _wallpaperUrlController.text.trim().isEmpty) {
+    if (_wallpaperUploadOption == 'url' && _wallpaperUrlController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إدخال رابط الصورة المباشر')));
       return;
     }
@@ -671,10 +691,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       final ts = DateTime.now().millisecondsSinceEpoch;
       String url;
 
-      if (_wallpaperUploadOption == 0 && _pickedWallpaperFile != null) {
+      if (_wallpaperUploadOption == 'file' && _pickedWallpaperFile != null) {
         final ext = _pickedWallpaperFile!.path.split('.').last;
         final path = 'wallpapers/$ts.$ext';
-        await _supabase.storage.from('wallpapers').upload(path, _pickedWallpaperFile!);
+        await _supabase.storage.from('wallpapers').upload(
+          path,
+          _pickedWallpaperFile!,
+          fileOptions: const FileOptions(upsert: true),
+        );
         url = _supabase.storage.from('wallpapers').getPublicUrl(path);
       } else {
         url = _wallpaperUrlController.text.trim();
@@ -706,11 +730,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   Future<void> _uploadIconPack() async {
     if (!_iconFormKey.currentState!.validate()) return;
 
-    if (_iconUploadOption == 0 && (_pickedIconFile == null || _pickedIconPreview == null)) {
+    if (_iconUploadOption == 'file' && (_pickedIconFile == null || _pickedIconPreview == null)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار ملف الحزمة وصورة المعاينة من الجهاز')));
       return;
     }
-    if (_iconUploadOption == 1 && (_iconFileUrlController.text.trim().isEmpty || _iconPreviewUrlController.text.trim().isEmpty)) {
+    if (_iconUploadOption == 'url' && (_iconFileUrlController.text.trim().isEmpty || _iconPreviewUrlController.text.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إدخال رابط الحزمة ورابط المعاينة المباشر')));
       return;
     }
@@ -722,16 +746,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       String prevUrl;
       String packUrl;
 
-      if (_iconUploadOption == 0 && _pickedIconPreview != null && _pickedIconFile != null) {
+      if (_iconUploadOption == 'file' && _pickedIconPreview != null && _pickedIconFile != null) {
         final prevExt = _pickedIconPreview!.path.split('.').last;
         final packExt = _pickedIconFile!.path.split('.').last;
 
         final prevPath = 'icons/prev_$ts.$prevExt';
-        await _supabase.storage.from('icons').upload(prevPath, _pickedIconPreview!);
+        await _supabase.storage.from('icons').upload(
+          prevPath,
+          _pickedIconPreview!,
+          fileOptions: const FileOptions(upsert: true),
+        );
         prevUrl = _supabase.storage.from('icons').getPublicUrl(prevPath);
 
         final packPath = 'icons/pack_$ts.$packExt';
-        await _supabase.storage.from('icons').upload(packPath, _pickedIconFile!);
+        await _supabase.storage.from('icons').upload(
+          packPath,
+          _pickedIconFile!,
+          fileOptions: const FileOptions(upsert: true),
+        );
         packUrl = _supabase.storage.from('icons').getPublicUrl(packPath);
       } else {
         prevUrl = _iconPreviewUrlController.text.trim();
@@ -766,13 +798,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   }
 
   // --- Real Deletion from Database and Storage ---
-  Future<void> _deleteItem(String table, String id, String title, {String? storageBucket, String? storagePath}) async {
+  Future<void> _deleteItem(String table, String id, String title, {List<MapEntry<String, String>> storageFiles = const []}) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF141129),
         title: const Text('تأكيد الحذف النهائي', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Text('هل أنت متأكد من حذف "$title" نهائياً من قاعدة البيانات والتخزين السحابي؟', style: const TextStyle(color: Colors.white70)),
+        content: Text('هل أنت متأكد من حذف "$title" نهائياً من قاعدة البيانات والتخزين السحابي Supabase؟', style: const TextStyle(color: Colors.white70)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           TextButton(
@@ -786,21 +818,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     if (confirmed != true) return;
 
     try {
-      // 1. Delete from Supabase Database
+      // 1. Delete record from Supabase Database
       await _supabase.from(table).delete().eq('id', id);
 
-      // 2. Delete from Supabase Storage if path exists
-      if (storageBucket != null && storagePath != null && storagePath.isNotEmpty) {
-        try {
-          await _supabase.storage.from(storageBucket).remove([storagePath]);
-        } catch (_) {}
+      // 2. Delete files from Supabase Storage buckets
+      for (final entry in storageFiles) {
+        final bucket = entry.key;
+        final path = entry.value;
+        if (path.isNotEmpty) {
+          try {
+            await _supabase.storage.from(bucket).remove([path]);
+          } catch (storageErr) {
+            debugPrint('Note: Storage cleanup: $storageErr');
+          }
+        }
       }
 
-      // 3. Instant UI refresh
+      // 3. Instant UI refresh from live tables
       if (table == 'themes') await _fetchThemes();
       if (table == 'wallpapers') await _fetchWallpapers();
       if (table == 'icons') await _fetchIcons();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحذف النهائي بنجاح')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحذف النهائي بنجاح من قاعدة البيانات والتخزين')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحذف: $e')));
     }
@@ -1028,7 +1066,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ..._themesList.map((t) => _buildItemTile(
                 title: t['title'] ?? '',
                 subtitle: '.${(t['format'] ?? 'hwt').toString().toUpperCase()} · ${t['size_mb'] ?? ''}',
-                onDelete: () => _deleteItem('themes', t['id'], t['title']),
+                onDelete: () => _deleteItem(
+                  'themes',
+                  t['id'].toString(),
+                  t['title'] ?? '',
+                  storageFiles: [
+                    if (_extractPathFromUrl(t['preview_url'], 'previews') != null)
+                      MapEntry('previews', _extractPathFromUrl(t['preview_url'], 'previews')!),
+                    if (_extractPathFromUrl(t['theme_file_url'], 'themes') != null)
+                      MapEntry('themes', _extractPathFromUrl(t['theme_file_url'], 'themes')!),
+                  ],
+                ),
               )),
         ],
       ),
@@ -1140,7 +1188,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ..._wallpapersList.map((w) => _buildItemTile(
                 title: w['title'] ?? '',
                 subtitle: '${w['category']} · ${w['resolution'] ?? ''}',
-                onDelete: () => _deleteItem('wallpapers', w['id'], w['title']),
+                onDelete: () => _deleteItem(
+                  'wallpapers',
+                  w['id'].toString(),
+                  w['title'] ?? '',
+                  storageFiles: [
+                    if (_extractPathFromUrl(w['image_url'], 'wallpapers') != null)
+                      MapEntry('wallpapers', _extractPathFromUrl(w['image_url'], 'wallpapers')!),
+                  ],
+                ),
               )),
         ],
       ),
@@ -1268,7 +1324,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ..._iconsList.map((i) => _buildItemTile(
                 title: i['title'] ?? '',
                 subtitle: '${i['developer'] ?? ''} · ${i['icons_count'] ?? ''} أيقونة',
-                onDelete: () => _deleteItem('icons', i['id'], i['title']),
+                onDelete: () => _deleteItem(
+                  'icons',
+                  i['id'].toString(),
+                  i['title'] ?? '',
+                  storageFiles: [
+                    if (_extractPathFromUrl(i['preview_url'], 'icons') != null)
+                      MapEntry('icons', _extractPathFromUrl(i['preview_url'], 'icons')!),
+                    if (_extractPathFromUrl(i['package_file_url'], 'icons') != null)
+                      MapEntry('icons', _extractPathFromUrl(i['package_file_url'], 'icons')!),
+                  ],
+                ),
               )),
         ],
       ),

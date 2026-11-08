@@ -377,7 +377,418 @@ class AppTheme {
 
 ---
 
-## 5. Screen 1: Wallpapers & Icons Screen
+## 5. Screen 1: Home Theme Store Screen (`lib/screens/home_screen.dart`)
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/theme_model.dart';
+import '../theme/app_theme.dart';
+import 'theme_details_screen.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final SupabaseClient _supabase = Supabase.instance.client;
+  String _selectedCategory = 'الكل';
+  final List<String> _categories = ['الكل', 'Cyberpunk', 'Neon AMOLED', 'Minimal', 'Honor Magic', 'Huawei EMUI'];
+
+  late Future<List<ThemeModel>> _themesFuture;
+  late Future<List<ThemeModel>> _popularThemesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThemes();
+  }
+
+  void _loadThemes() {
+    setState(() {
+      _themesFuture = _fetchThemesFromSupabase();
+      _popularThemesFuture = _fetchPopularThemesFromSupabase();
+    });
+  }
+
+  Future<List<ThemeModel>> _fetchThemesFromSupabase() async {
+    try {
+      var query = _supabase.from('themes').select();
+      if (_selectedCategory != 'الكل') {
+        query = query.eq('category', _selectedCategory);
+      }
+      final response = await query.order('created_at', ascending: false);
+      return (response as List).map((map) => ThemeModel.fromMap(map)).toList();
+    } catch (e) {
+      debugPrint('Error fetching live themes from Supabase: $e');
+      return [];
+    }
+  }
+
+  Future<List<ThemeModel>> _fetchPopularThemesFromSupabase() async {
+    try {
+      final response = await _supabase
+          .from('themes')
+          .select()
+          .order('rating', ascending: false)
+          .limit(6);
+      return (response as List).map((map) => ThemeModel.fromMap(map)).toList();
+    } catch (e) {
+      debugPrint('Error fetching popular themes: $e');
+      return [];
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.darkBackground,
+      appBar: AppBar(
+        title: const Text('Magic Themes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+        centerTitle: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search, color: Colors.white),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: AppColors.neonCyan),
+            onPressed: _loadThemes,
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        color: AppColors.neonCyan,
+        backgroundColor: AppColors.darkSurface,
+        onRefresh: () async => _loadThemes(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Hero Banner
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF28144D), Color(0xFF0F223D)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  border: Border.all(color: AppColors.neonPurple.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.neonCyan.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'MagicOS & EMUI Store',
+                              style: TextStyle(color: AppColors.neonCyan, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'ثيمات احترافية متوافقة مع هواتف هونر وهواوي',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'حزم .HWT و .HNT أصلية جاهزة للتطبيق الفوري',
+                            style: TextStyle(fontSize: 12, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(Icons.auto_awesome, color: AppColors.neonAmber, size: 40),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Categories Filter Chips
+              SizedBox(
+                height: 38,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _categories.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final cat = _categories[index];
+                    final isSelected = cat == _selectedCategory;
+                    return ChoiceChip(
+                      label: Text(cat, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 12)),
+                      selected: isSelected,
+                      selectedColor: AppColors.neonPurple,
+                      backgroundColor: const Color(0xFF141129),
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _selectedCategory = cat;
+                            _themesFuture = _fetchThemesFromSupabase();
+                          });
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Popular Themes Section (Real Supabase FutureBuilder)
+              const Text(
+                'الثيمات الأكثر شعبية',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 230,
+                child: FutureBuilder<List<ThemeModel>>(
+                  future: _popularThemesFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: AppColors.neonPurple));
+                    }
+                    final popularThemes = snapshot.data ?? [];
+                    if (popularThemes.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF141129),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Center(
+                          child: Text('لا توجد ثيمات شائعة مسجلة حالياً', style: TextStyle(color: Colors.white54)),
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: popularThemes.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final theme = popularThemes[index];
+                        return _buildPopularCard(theme);
+                      },
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              // All / Category Themes Section (Real Supabase FutureBuilder)
+              Text(
+                _selectedCategory == 'الكل' ? 'جميع الثيمات المتوفرة' : 'ثيمات تصنيف: $_selectedCategory',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 14),
+              FutureBuilder<List<ThemeModel>>(
+                future: _themesFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator(color: AppColors.neonCyan)));
+                  }
+                  final themes = snapshot.data ?? [];
+                  if (themes.isEmpty) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141129),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0x228C52FF)),
+                      ),
+                      child: Column(
+                        children: const [
+                          Icon(Icons.palette_outlined, color: Colors.white30, size: 48),
+                          SizedBox(height: 12),
+                          Text('لا توجد ثيمات في هذا التصنيف بعد', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                          SizedBox(height: 4),
+                          Text('يمكن للمسؤول رفع ثيمات جديدة من لوحة التحكم', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                        ],
+                      ),
+                    );
+                  }
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.68,
+                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 16,
+                    ),
+                    itemCount: themes.length,
+                    itemBuilder: (context, index) {
+                      final theme = themes[index];
+                      return _buildThemeGridCard(theme);
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPopularCard(ThemeModel theme) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ThemeDetailsScreen(theme: theme))),
+      child: Container(
+        width: 140,
+        decoration: BoxDecoration(
+          color: const Color(0xFF141129),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.neonPurple.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                child: theme.previewImageUrl != null && theme.previewImageUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: theme.previewImageUrl!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        placeholder: (_, __) => Container(color: const Color(0xFF1B1736)),
+                        errorWidget: (_, __) => Container(color: const Color(0xFF1B1736), child: const Icon(Icons.broken_image, color: Colors.white24)),
+                      )
+                    : Container(color: const Color(0xFF1B1736), child: const Icon(Icons.style, color: Colors.white24)),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(theme.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(theme.compatibleVersions.contains('Honor') ? '.HNT' : '.HWT', style: const TextStyle(color: AppColors.neonCyan, fontSize: 10, fontWeight: FontWeight.bold)),
+                      Row(
+                        children: [
+                          const Icon(Icons.star, color: AppColors.neonAmber, size: 12),
+                          const SizedBox(width: 2),
+                          Text(theme.rating.toStringAsFixed(1), style: const TextStyle(fontSize: 10)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeGridCard(ThemeModel theme) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ThemeDetailsScreen(theme: theme))),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF141129),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.neonPurple.withOpacity(0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    theme.previewImageUrl != null && theme.previewImageUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: theme.previewImageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(color: const Color(0xFF1B1736)),
+                            errorWidget: (_, __) => Container(color: const Color(0xFF1B1736), child: const Icon(Icons.broken_image, color: Colors.white24)),
+                          )
+                        : Container(color: const Color(0xFF1B1736), child: const Icon(Icons.style, color: Colors.white24)),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.neonCyan.withOpacity(0.5)),
+                        ),
+                        child: Text(
+                          theme.compatibleVersions.contains('Honor') ? 'MagicOS (.hnt)' : 'EMUI (.hwt)',
+                          style: const TextStyle(color: AppColors.neonCyan, fontSize: 9, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(theme.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 2),
+                  Text(theme.creator, maxLines: 1, style: const TextStyle(color: Colors.white60, fontSize: 11)),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.star, color: AppColors.neonAmber, size: 12),
+                          const SizedBox(width: 3),
+                          Text(theme.rating.toStringAsFixed(1), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      Text(theme.sizeMb, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+---
+
+## 6. Screen 2: Wallpapers & Icons Screen
 
 ### `lib/screens/wallpapers_screen.dart`
 ```dart
