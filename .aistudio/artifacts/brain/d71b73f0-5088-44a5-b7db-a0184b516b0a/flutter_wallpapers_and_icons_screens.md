@@ -80,12 +80,13 @@ class _WallpapersScreenState extends State<WallpapersScreen> {
           .from('wallpapers')
           .select()
           .eq('category', category)
-          .order('downloads_count', ascending: false);
+          .order('created_at', ascending: false);
 
       final list = (response as List).map((e) => WallpaperItem.fromMap(e)).toList();
-      return list.isNotEmpty ? list : _getFallbackWallpapers(category);
-    } catch (_) {
-      return _getFallbackWallpapers(category);
+      return list;
+    } catch (e) {
+      debugPrint('Error loading wallpapers from Supabase: $e');
+      return [];
     }
   }
 
@@ -336,47 +337,6 @@ class _WallpapersScreenState extends State<WallpapersScreen> {
       ),
     );
   }
-
-  List<WallpaperItem> _getFallbackWallpapers(String category) => [
-    WallpaperItem(
-      id: 'w1',
-      title: 'Cyber Skyscraper',
-      category: category,
-      imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800',
-      isLive: true,
-    ),
-    WallpaperItem(
-      id: 'w2',
-      title: 'Cosmic Nebula',
-      category: category,
-      imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800',
-      isLive: true,
-    ),
-    WallpaperItem(
-      id: 'w3',
-      title: 'Neon Samurai',
-      category: category,
-      imageUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=800',
-    ),
-    WallpaperItem(
-      id: 'w4',
-      title: 'Starlight Orbit',
-      category: category,
-      imageUrl: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=800',
-    ),
-    WallpaperItem(
-      id: 'w5',
-      title: 'Rainy Cyberpunk',
-      category: category,
-      imageUrl: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=800',
-    ),
-    WallpaperItem(
-      id: 'w6',
-      title: 'Liquid Wave',
-      category: category,
-      imageUrl: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=800',
-    ),
-  ];
 }
 
 class WallpaperCard extends StatelessWidget {
@@ -554,14 +514,15 @@ class _IconsScreenState extends State<IconsScreen> {
   Future<List<IconPackItem>> _loadIconPacks() async {
     try {
       final response = await _supabase
-          .from('icon_packs')
+          .from('icons')
           .select()
-          .order('rating', ascending: false);
+          .order('created_at', ascending: false);
 
       final list = (response as List).map((e) => IconPackItem.fromMap(e)).toList();
-      return list.isNotEmpty ? list : _getFallbackIconPacks();
-    } catch (_) {
-      return _getFallbackIconPacks();
+      return list;
+    } catch (e) {
+      debugPrint('Error loading icons from Supabase: $e');
+      return [];
     }
   }
 
@@ -727,49 +688,6 @@ class _IconsScreenState extends State<IconsScreen> {
       ),
     );
   }
-
-  List<IconPackItem> _getFallbackIconPacks() => [
-    IconPackItem(
-      id: 'p1',
-      title: 'Curtanly Curt...',
-      developer: 'Curt Lab',
-      rating: 5.0,
-      iconCount: '1,450+ icônes',
-      styleTag: 'Clay 3D',
-      primaryColorHex: 0xFFFFB800,
-      downloadUrl: '',
-    ),
-    IconPackItem(
-      id: 'p2',
-      title: 'Neon Glow Icons',
-      developer: 'CyberArts',
-      rating: 5.0,
-      iconCount: '2,800+ icônes',
-      styleTag: 'Neon 3D',
-      primaryColorHex: 0xFF8C52FF,
-      downloadUrl: '',
-    ),
-    IconPackItem(
-      id: 'p3',
-      title: 'Pastel Soft 3D',
-      developer: 'Mochi Studio',
-      rating: 4.9,
-      iconCount: '920+ icônes',
-      styleTag: 'Pastel Soft',
-      primaryColorHex: 0xFFFF2A85,
-      downloadUrl: '',
-    ),
-    IconPackItem(
-      id: 'p4',
-      title: 'Obsidian Minimal',
-      developer: 'Hexa Design',
-      rating: 5.0,
-      iconCount: '3,100+ icônes',
-      styleTag: 'Minimalist',
-      primaryColorHex: 0xFF00D2FF,
-      downloadUrl: '',
-    ),
-  ];
 }
 
 class IconPackCard extends StatelessWidget {

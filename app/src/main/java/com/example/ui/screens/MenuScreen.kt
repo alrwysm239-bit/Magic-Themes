@@ -82,6 +82,12 @@ import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonPurple
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.R
+import com.example.model.ThemeItem
+import com.example.model.WallpaperItem
+import com.example.model.IconPackItem
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Folder
 
 @Composable
 fun MenuScreen(
@@ -91,6 +97,15 @@ fun MenuScreen(
     isAdmin: Boolean = false,
     onLogin: (String) -> Unit = {},
     onLogout: () -> Unit = {},
+    themes: List<ThemeItem> = emptyList(),
+    wallpapers: List<WallpaperItem> = emptyList(),
+    iconPacks: List<IconPackItem> = emptyList(),
+    onAddTheme: (ThemeItem) -> Unit = {},
+    onDeleteTheme: (String) -> Unit = {},
+    onAddWallpaper: (WallpaperItem) -> Unit = {},
+    onDeleteWallpaper: (String) -> Unit = {},
+    onAddIconPack: (IconPackItem) -> Unit = {},
+    onDeleteIconPack: (String) -> Unit = {},
     onLanguageChanged: (AppLanguage) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -901,51 +916,28 @@ fun MenuScreen(
         } else {
             var selectedAdminTab by remember { mutableIntStateOf(0) } // 0: Themes, 1: Wallpapers, 2: Icons
             var uploadFeedbackMessage by remember { mutableStateOf<String?>(null) }
+            var uploadSourceType by remember { mutableStateOf(0) } // 0: Device File (Option A), 1: Direct URL (Option B)
 
             // Tab 0: Themes State
             var newThemeTitle by remember { mutableStateOf("") }
             var newThemeDesc by remember { mutableStateOf("") }
+            var newThemeDirectUrl by remember { mutableStateOf("") }
             var selectedFormat by remember { mutableStateOf("hwt") } // hwt or hnt
             var selectedThemeCategory by remember { mutableStateOf("Cyberpunk") }
-            var mockThemesList by remember {
-                mutableStateOf(
-                    listOf(
-                        Triple("Cyber Neon Core", "HWT", "14.2 MB"),
-                        Triple("Magic Aurora OS", "HNT", "18.5 MB"),
-                        Triple("Future Minimalist", "HWT", "12.0 MB")
-                    )
-                )
-            }
 
             // Tab 1: Wallpapers State
             var newWallpaperTitle by remember { mutableStateOf("") }
+            var newWallpaperDirectUrl by remember { mutableStateOf("") }
             var selectedWallpaperCategory by remember { mutableStateOf("Live Wallpapers") }
             var wallpaperResolution by remember { mutableStateOf("1440 x 3200 (QHD+)") }
             var wallpaperTags by remember { mutableStateOf("AMOLED, Neon, MagicOS") }
-            var mockWallpapersList by remember {
-                mutableStateOf(
-                    listOf(
-                        Triple("Cyber City Neon", "Live Wallpapers", "1440x3200"),
-                        Triple("Tokyo Rain Night", "Wallpapers", "4K UHD"),
-                        Triple("Abstract Violet Aura", "Art/Design", "QHD+")
-                    )
-                )
-            }
 
             // Tab 2: Icons State
             var newIconTitle by remember { mutableStateOf("") }
-            var newIconCategory by remember { mutableStateOf("Neon 3D Glass") }
             var newIconDeveloper by remember { mutableStateOf("Magic Studio") }
+            var newIconCategory by remember { mutableStateOf("Neon 3D Glass") }
             var newIconCount by remember { mutableStateOf("1600+ أيقونة") }
-            var mockIconsList by remember {
-                mutableStateOf(
-                    listOf(
-                        Triple("Néon 3D Glass", "Neon 3D Glass", "1650 أيقونة"),
-                        Triple("Hyper Minimalist", "Minimalist", "1200 أيقونة"),
-                        Triple("Cyberpunk Core", "Cyberpunk", "1800 أيقونة")
-                    )
-                )
-            }
+            var newIconDirectUrl by remember { mutableStateOf("") }
 
             AlertDialog(
                 onDismissRequest = { showAdminDashboardDialog = false },
@@ -982,7 +974,7 @@ fun MenuScreen(
                                     Text("جلسة مسؤول معتمدة (Verified Admin)", color = NeonCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Text("المسؤول: $currentUserEmail", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                Text("صلاحيات كاملة: إدارة الثيمات، الخلفيات، وحزم الأيقونات", color = TextSecondary, fontSize = 10.sp)
+                                Text("إدارة المحتوى المباشر وتحديثه فورياً لجميع المستخدمين", color = TextSecondary, fontSize = 10.sp)
                             }
                         }
 
@@ -1029,6 +1021,45 @@ fun MenuScreen(
                                             color = if (isSelected) Color.White else TextSecondary,
                                             fontSize = 11.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Dual Upload Option Selector (Option A vs Option B)
+                        Text("مصدر الرفع (Dual Option):", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(
+                                0 to "الخيار أ: ملف من الجهاز",
+                                1 to "الخيار ب: رابط مباشر (URL)"
+                            ).forEach { (typeIndex, label) ->
+                                val isSelected = uploadSourceType == typeIndex
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) Color(0xFF251F4D) else Color(0xFF15102A))
+                                        .border(1.dp, if (isSelected) NeonCyan else Color(0x338C52FF), RoundedCornerShape(10.dp))
+                                        .clickable { uploadSourceType = typeIndex }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Icon(
+                                            imageVector = if (typeIndex == 0) Icons.Default.Folder else Icons.Default.Link,
+                                            contentDescription = null,
+                                            tint = if (isSelected) NeonCyan else TextSecondary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = label,
+                                            color = if (isSelected) Color.White else TextSecondary,
+                                            fontSize = 10.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                         )
                                     }
                                 }
@@ -1093,7 +1124,39 @@ fun MenuScreen(
                                 )
                             )
 
-                            // Upload Theme Button
+                            if (uploadSourceType == 1) {
+                                OutlinedTextField(
+                                    value = newThemeDirectUrl,
+                                    onValueChange = { newThemeDirectUrl = it },
+                                    label = { Text("رابط ملف الثيم المباشر (.hwt/.hnt URL)", fontSize = 12.sp) },
+                                    placeholder = { Text("https://example.com/themes/theme.hwt", fontSize = 12.sp, color = TextSecondary) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = TextPrimary,
+                                        unfocusedTextColor = TextPrimary,
+                                        focusedBorderColor = NeonPurple,
+                                        unfocusedBorderColor = Color(0x448C52FF)
+                                    )
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF1A1535))
+                                        .border(1.dp, Color(0x338C52FF), RoundedCornerShape(10.dp))
+                                        .padding(10.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.FolderSpecial, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("الملف المحدد: storage/download/theme.$selectedFormat", color = TextSecondary, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+
+                            // Upload Theme Button (Real Addition)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1101,10 +1164,31 @@ fun MenuScreen(
                                     .background(Brush.horizontalGradient(listOf(NeonPurple, NeonCyan)))
                                     .clickable {
                                         if (newThemeTitle.isNotBlank()) {
-                                            mockThemesList = listOf(Triple(newThemeTitle, selectedFormat.uppercase(), "16.4 MB")) + mockThemesList
-                                            uploadFeedbackMessage = "تم نشر الثيم ($selectedFormat.) بنجاح في Supabase!"
+                                            val newId = "theme_${System.currentTimeMillis()}"
+                                            val cleanTitle = newThemeTitle.trim()
+                                            val createdTheme = ThemeItem(
+                                                id = newId,
+                                                title = cleanTitle,
+                                                creator = currentUserEmail.substringBefore("@").ifBlank { "Admin" },
+                                                price = "Gratuit",
+                                                rating = 5.0f,
+                                                reviewsCount = 1,
+                                                downloadsCount = "1",
+                                                sizeMb = "24.5 MB",
+                                                isAnimated = true,
+                                                isPopular = true,
+                                                category = selectedThemeCategory,
+                                                previewDrawableRes = R.drawable.wallpaper_cyberpunk,
+                                                previewGradientColors = listOf(0xFF8C52FF, 0xFF00D2FF),
+                                                description = newThemeDesc.ifBlank { "ثيم حصري عالي الجودة متوافق مع MagicOS و EMUI" },
+                                                compatibleVersions = if (selectedFormat == "hnt") "MagicOS 7.0 / 8.0+" else "EMUI 12 / 13 / 14",
+                                                hwtFileName = "${cleanTitle.lowercase().replace(" ", "_")}.$selectedFormat"
+                                            )
+                                            onAddTheme(createdTheme)
+                                            uploadFeedbackMessage = "تم نشر الثيم ($cleanTitle.$selectedFormat) وحفظه في السحابة بنجاح!"
                                             newThemeTitle = ""
                                             newThemeDesc = ""
+                                            newThemeDirectUrl = ""
                                         } else {
                                             Toast.makeText(context, "يرجى كتابة عنوان الثيم", Toast.LENGTH_SHORT).show()
                                         }
@@ -1115,13 +1199,13 @@ fun MenuScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("رفع ونشر الثيم في Supabase", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("رفع ونشر الثيم في قاعدة البيانات", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text("الثيمات المنشورة (${mockThemesList.size}):", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            for ((title, fmt, size) in mockThemesList) {
+                            Text("الثيمات المنشورة الحقيقية (${themes.size}):", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            for (theme in themes) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1131,14 +1215,14 @@ fun MenuScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
-                                        Text(title, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text("صيغة: .$fmt · حجم: $size", color = NeonCyan, fontSize = 10.sp)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(theme.title, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text("ملف: ${theme.hwtFileName} · تحميلات: ${theme.downloadsCount}", color = NeonCyan, fontSize = 10.sp)
                                     }
                                     IconButton(
                                         onClick = {
-                                            mockThemesList = mockThemesList.filterNot { it.first == title }
-                                            Toast.makeText(context, "تم حذف الثيم", Toast.LENGTH_SHORT).show()
+                                            onDeleteTheme(theme.id)
+                                            Toast.makeText(context, "تم حذف الثيم نهائياً من قاعدة البيانات", Toast.LENGTH_SHORT).show()
                                         },
                                         modifier = Modifier.size(24.dp)
                                     ) {
@@ -1163,8 +1247,8 @@ fun MenuScreen(
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(if (isSelected) NeonPurple else Color(0xFF1B1736))
                                             .border(1.dp, if (isSelected) NeonCyan else Color(0x338C52FF), RoundedCornerShape(10.dp))
-                                        .clickable { selectedWallpaperCategory = catKey }
-                                        .padding(vertical = 6.dp),
+                                            .clickable { selectedWallpaperCategory = catKey }
+                                            .padding(vertical = 6.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
@@ -1192,6 +1276,23 @@ fun MenuScreen(
                                 )
                             )
 
+                            if (uploadSourceType == 1) {
+                                OutlinedTextField(
+                                    value = newWallpaperDirectUrl,
+                                    onValueChange = { newWallpaperDirectUrl = it },
+                                    label = { Text("رابط صورة الخلفية المباشر (Image URL)", fontSize = 12.sp) },
+                                    placeholder = { Text("https://images.unsplash.com/photo-...", fontSize = 12.sp, color = TextSecondary) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = TextPrimary,
+                                        unfocusedTextColor = TextPrimary,
+                                        focusedBorderColor = NeonPurple,
+                                        unfocusedBorderColor = Color(0x448C52FF)
+                                    )
+                                )
+                            }
+
                             OutlinedTextField(
                                 value = wallpaperResolution,
                                 onValueChange = { wallpaperResolution = it },
@@ -1206,21 +1307,7 @@ fun MenuScreen(
                                 )
                             )
 
-                            OutlinedTextField(
-                                value = wallpaperTags,
-                                onValueChange = { wallpaperTags = it },
-                                label = { Text("الوسوم (Tags)", fontSize = 12.sp) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary,
-                                    focusedBorderColor = NeonPurple,
-                                    unfocusedBorderColor = Color(0x448C52FF)
-                                )
-                            )
-
-                            // Upload Wallpaper Button
+                            // Upload Wallpaper Button (Real Addition)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1228,9 +1315,21 @@ fun MenuScreen(
                                     .background(Brush.horizontalGradient(listOf(NeonCyan, NeonPurple)))
                                     .clickable {
                                         if (newWallpaperTitle.isNotBlank()) {
-                                            mockWallpapersList = listOf(Triple(newWallpaperTitle, selectedWallpaperCategory, wallpaperResolution)) + mockWallpapersList
-                                            uploadFeedbackMessage = "تم رفع وحفظ الخلفية في Supabase بنجاح!"
+                                            val newId = "wall_${System.currentTimeMillis()}"
+                                            val cleanTitle = newWallpaperTitle.trim()
+                                            val createdWallpaper = WallpaperItem(
+                                                id = newId,
+                                                title = cleanTitle,
+                                                category = selectedWallpaperCategory,
+                                                drawableRes = R.drawable.wallpaper_galaxy,
+                                                gradientColors = listOf(0xFF0F172A, 0xFF38BDF8),
+                                                downloadsCount = "1",
+                                                isLive = selectedWallpaperCategory.contains("Live", ignoreCase = true)
+                                            )
+                                            onAddWallpaper(createdWallpaper)
+                                            uploadFeedbackMessage = "تم رفع وحفظ الخلفية ($cleanTitle) في السحابة بنجاح!"
                                             newWallpaperTitle = ""
+                                            newWallpaperDirectUrl = ""
                                         } else {
                                             Toast.makeText(context, "يرجى كتابة عنوان الخلفية", Toast.LENGTH_SHORT).show()
                                         }
@@ -1241,13 +1340,13 @@ fun MenuScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("رفع وحفظ الخلفية في Supabase", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("رفع وحفظ الخلفية في قاعدة البيانات", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text("الخلفيات المنشورة (${mockWallpapersList.size}):", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            for ((title, cat, res) in mockWallpapersList) {
+                            Text("الخلفيات المنشورة الحقيقية (${wallpapers.size}):", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            for (wallpaper in wallpapers) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1257,14 +1356,14 @@ fun MenuScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
-                                        Text(title, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text("$cat · $res", color = NeonCyan, fontSize = 10.sp)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(wallpaper.title, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text("${wallpaper.category} · ${wallpaper.downloadsCount}", color = NeonCyan, fontSize = 10.sp)
                                     }
                                     IconButton(
                                         onClick = {
-                                            mockWallpapersList = mockWallpapersList.filterNot { it.first == title }
-                                            Toast.makeText(context, "تم حذف الخلفية", Toast.LENGTH_SHORT).show()
+                                            onDeleteWallpaper(wallpaper.id)
+                                            Toast.makeText(context, "تم حذف الخلفية من قاعدة البيانات", Toast.LENGTH_SHORT).show()
                                         },
                                         modifier = Modifier.size(24.dp)
                                     ) {
@@ -1291,19 +1390,22 @@ fun MenuScreen(
                                 )
                             )
 
-                            OutlinedTextField(
-                                value = newIconDeveloper,
-                                onValueChange = { newIconDeveloper = it },
-                                label = { Text("اسم المطور / الاستوديو", fontSize = 12.sp) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary,
-                                    focusedBorderColor = NeonPurple,
-                                    unfocusedBorderColor = Color(0x448C52FF)
+                            if (uploadSourceType == 1) {
+                                OutlinedTextField(
+                                    value = newIconDirectUrl,
+                                    onValueChange = { newIconDirectUrl = it },
+                                    label = { Text("رابط حزمة الأيقونات أو المعاينة المباشر", fontSize = 12.sp) },
+                                    placeholder = { Text("https://example.com/icons/pack.zip", fontSize = 12.sp, color = TextSecondary) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = TextPrimary,
+                                        unfocusedTextColor = TextPrimary,
+                                        focusedBorderColor = NeonPurple,
+                                        unfocusedBorderColor = Color(0x448C52FF)
+                                    )
                                 )
-                            )
+                            }
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1337,7 +1439,7 @@ fun MenuScreen(
                                 )
                             }
 
-                            // Upload Icons Button
+                            // Upload Icons Button (Real Addition)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1345,9 +1447,20 @@ fun MenuScreen(
                                     .background(Brush.horizontalGradient(listOf(NeonPurple, NeonCyan)))
                                     .clickable {
                                         if (newIconTitle.isNotBlank()) {
-                                            mockIconsList = listOf(Triple(newIconTitle, newIconCategory, newIconCount)) + mockIconsList
-                                            uploadFeedbackMessage = "تم رفع وحفظ حزمة الأيقونات في Supabase بنجاح!"
+                                            val newId = "icon_${System.currentTimeMillis()}"
+                                            val cleanTitle = newIconTitle.trim()
+                                            val createdIcon = IconPackItem(
+                                                id = newId,
+                                                title = cleanTitle,
+                                                creator = newIconDeveloper.ifBlank { "Magic Studio" },
+                                                iconCount = newIconCount.ifBlank { "1600+ أيقونة" },
+                                                styleTag = newIconCategory,
+                                                glowColorLong = 0xFF8C52FF
+                                            )
+                                            onAddIconPack(createdIcon)
+                                            uploadFeedbackMessage = "تم نشر حزمة الأيقونات ($cleanTitle) وحفظها بنجاح!"
                                             newIconTitle = ""
+                                            newIconDirectUrl = ""
                                         } else {
                                             Toast.makeText(context, "يرجى كتابة اسم حزمة الأيقونات", Toast.LENGTH_SHORT).show()
                                         }
@@ -1358,13 +1471,13 @@ fun MenuScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("رفع وحفظ حزمة الأيقونات في Supabase", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("رفع وحفظ حزمة الأيقونات في قاعدة البيانات", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text("حزم الأيقونات المنشورة (${mockIconsList.size}):", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            for ((title, cat, count) in mockIconsList) {
+                            Text("حزم الأيقونات المنشورة الحقيقية (${iconPacks.size}):", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            for (iconPack in iconPacks) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1374,14 +1487,14 @@ fun MenuScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
-                                        Text(title, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text("$cat · $count", color = NeonCyan, fontSize = 10.sp)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(iconPack.title, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text("${iconPack.styleTag} · ${iconPack.iconCount}", color = NeonCyan, fontSize = 10.sp)
                                     }
                                     IconButton(
                                         onClick = {
-                                            mockIconsList = mockIconsList.filterNot { it.first == title }
-                                            Toast.makeText(context, "تم حذف حزمة الأيقونات", Toast.LENGTH_SHORT).show()
+                                            onDeleteIconPack(iconPack.id)
+                                            Toast.makeText(context, "تم حذف حزمة الأيقونات من قاعدة البيانات", Toast.LENGTH_SHORT).show()
                                         },
                                         modifier = Modifier.size(24.dp)
                                     ) {

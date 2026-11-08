@@ -254,43 +254,45 @@ class SupabaseService {
       final response = await query.order('rating', ascending: false);
       return (response as List).map((map) => ThemeModel.fromMap(map)).toList();
     } catch (e) {
-      // Graceful fallback with offline curated data if table is currently empty
-      return _getFallbackThemes();
+      debugPrint('Error fetching live themes from Supabase: $e');
+      return [];
     }
   }
 
-  // Fetch Wallpapers
+  // Fetch Wallpapers dynamically from Supabase
   Future<List<WallpaperModel>> fetchWallpapers({String? category}) async {
     try {
       var query = client.from('wallpapers').select();
       if (category != null && category.isNotEmpty) {
         query = query.eq('category', category);
       }
-      final response = await query.order('downloads_count', ascending: false);
+      final response = await query.order('created_at', ascending: false);
       return (response as List).map((map) => WallpaperModel.fromMap(map)).toList();
     } catch (e) {
-      return _getFallbackWallpapers();
+      debugPrint('Error fetching live wallpapers from Supabase: $e');
+      return [];
     }
   }
 
-  // Fetch Icon Packs
+  // Fetch Icon Packs dynamically from Supabase
   Future<List<IconPackModel>> fetchIconPacks() async {
     try {
-      final response = await client.from('icon_packs').select().order('rating', ascending: false);
+      final response = await client.from('icons').select().order('created_at', ascending: false);
       return (response as List).map((map) => IconPackModel.fromMap(map)).toList();
     } catch (e) {
-      return _getFallbackIconPacks();
+      debugPrint('Error fetching live icons from Supabase: $e');
+      return [];
     }
   }
 
-  // Download .HWT theme file from Supabase Storage and save into /Honor/Themes/ or local directory
+  // Download .HWT / .HNT theme file from Supabase Storage and save into /Honor/Themes/ or local directory
   Future<File> downloadHwtFile({
     required String storagePath,
     required String fileName,
     required Function(double progress) onProgress,
   }) async {
-    // 1. Get signed/public URL from Supabase Storage bucket 'themes_hwt'
-    final String publicUrl = client.storage.from('themes_hwt').getPublicUrl(storagePath);
+    // 1. Get signed/public URL from Supabase Storage bucket 'themes'
+    final String publicUrl = client.storage.from('themes').getPublicUrl(storagePath);
 
     // 2. Prepare destination path in /Honor/Themes or App Directory
     Directory baseDir;
@@ -305,10 +307,10 @@ class SupabaseService {
       baseDir = await getApplicationDocumentsDirectory();
     }
 
-    final safeFileName = fileName.endsWith('.hwt') ? fileName : '$fileName.hwt';
+    final safeFileName = (fileName.endsWith('.hwt') || fileName.endsWith('.hnt')) ? fileName : '$fileName.hwt';
     final targetFile = File('${baseDir.path}/$safeFileName');
 
-    // 3. Download with progress tracking
+    // 3. Real HTTP download with progress tracking
     await dio.download(
       publicUrl,
       targetFile.path,
@@ -321,80 +323,6 @@ class SupabaseService {
 
     return targetFile;
   }
-
-  List<ThemeModel> _getFallbackThemes() => [
-    ThemeModel(
-      id: '1',
-      title: '[PHIN] Fall Sunset',
-      creator: 'Jokkat by Riode',
-      price: 'Gratuit',
-      rating: 5.0,
-      reviewsCount: 25,
-      downloadsCount: '71k',
-      sizeMb: '28.4 MB',
-      isAnimated: true,
-      isPopular: true,
-      isEditorsChoice: true,
-      categoryId: 'cyberpunk',
-      previewImageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800',
-      description: 'Thème exclusif aux teintes chaudes automnales et accents néon dorés pour MagicOS et EMUI.',
-      hwtStoragePath: 'themes/phin_fall_sunset.hwt',
-    ),
-    ThemeModel(
-      id: '2',
-      title: '[SW] ARC Galaxy',
-      creator: 'StarWave Studio',
-      price: 'MAD 19,00',
-      rating: 4.9,
-      reviewsCount: 84,
-      downloadsCount: '45k',
-      sizeMb: '34.2 MB',
-      isAnimated: true,
-      isPopular: true,
-      categoryId: 'noir',
-      previewImageUrl: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=800',
-      description: 'Inspiré par les profondeurs nébuleuses de l\'espace et arcs lumineux néon.',
-      hwtStoragePath: 'themes/sw_arc_galaxy.hwt',
-    ),
-  ];
-
-  List<WallpaperModel> _getFallbackWallpapers() => [
-    WallpaperModel(
-      id: 'w1',
-      title: 'Cyber Metropolis',
-      category: 'Live Wallpapers',
-      imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800',
-      isLive: true,
-    ),
-    WallpaperModel(
-      id: 'w2',
-      title: 'Deep Cosmic Planet',
-      category: 'Live Wallpapers',
-      imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800',
-      isLive: true,
-    ),
-  ];
-
-  List<IconPackModel> _getFallbackIconPacks() => [
-    IconPackModel(
-      id: 'ip1',
-      title: 'Curtainly Curt...',
-      creator: 'Curt Lab',
-      rating: 5.0,
-      iconCount: '1,450+ icônes',
-      styleTag: 'Clay 3D',
-      downloadUrl: '',
-    ),
-    IconPackModel(
-      id: 'ip2',
-      title: 'Neon Glow Icons',
-      creator: 'CyberArts',
-      rating: 5.0,
-      iconCount: '2,800+ icônes',
-      styleTag: 'Neon 3D',
-      downloadUrl: '',
-    ),
-  ];
 }
 ```
 

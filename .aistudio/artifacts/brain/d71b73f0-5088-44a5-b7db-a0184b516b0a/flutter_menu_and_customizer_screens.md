@@ -7,7 +7,11 @@ This document provides the redesigned, production-ready Flutter implementations 
 ## 1. Customizer Screen (`lib/screens/customizer_screen.dart`)
 
 ```dart
+import 'dart:convert';
+import 'dart:io';
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 class CustomizerScreen extends StatefulWidget {
   const CustomizerScreen({super.key});
@@ -45,62 +49,113 @@ class _CustomizerScreenState extends State<CustomizerScreen> {
   final List<String> _clockStyles = ['نيون رقمي', 'مينيمال أنيق', 'ساعة مزدوجة'];
   final List<String> _iconStyles = ['نيون 3D Glass', 'باستيل ناعم', 'سايبر جليتش', 'أسود AMOLED'];
 
-  void _exportHwtTheme() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF141129),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: Color(0xFF8C52FF), width: 1.5),
-        ),
-        title: Row(
-          children: const [
-            Icon(Icons.auto_awesome, color: Color(0xFF00D2FF)),
-            SizedBox(width: 8),
-            Text('تم تصدير حزمة .hwt بنجاح', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'تم إنشاء حزمة الثيم المخصصة بنجاح وهي متوافقة تماماً مع Honor MagicOS و Huawei EMUI.',
-              style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1F1A3B),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0x338C52FF)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('اللون المخصص: #${_accentColor.value.toRadixString(16).substring(2).toUpperCase()}',
-                      style: const TextStyle(color: Color(0xFF00D2FF), fontSize: 11, fontFamily: 'monospace')),
-                  const SizedBox(height: 4),
-                  Text('نمط الأيقونات: ${_iconStyles[_selectedIconPackIndex]}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                  const SizedBox(height: 4),
-                  Text('شكل الساعة: ${_clockStyles[_selectedClockIndex]}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إغلاق', style: TextStyle(color: Color(0xFF8C52FF), fontWeight: FontWeight.bold)),
+  Future<void> _exportHwtTheme() async {
+    try {
+      final archive = Archive();
+      final hexColor = '#${_accentColor.value.toRadixString(16).substring(2).toUpperCase()}';
+
+      // 1. Generate real description.xml for Huawei / Honor theme engine
+      final xmlContent = '''<?xml version="1.0" encoding="utf-8"?>
+<theme>
+    <title>Magic Custom Theme</title>
+    <title-cn>Magic Custom Theme</title-cn>
+    <author>Magic Themes Studio</author>
+    <designer>Magic Themes Studio</designer>
+    <screen>FHD</screen>
+    <version>12.0.0</version>
+    <accent_color>$hexColor</accent_color>
+    <clock_style>${_clockStyles[_selectedClockIndex]}</clock_style>
+    <icon_pack>${_iconStyles[_selectedIconPackIndex]}</icon_pack>
+</theme>''';
+      final xmlBytes = utf8.encode(xmlContent);
+      archive.addFile(ArchiveFile('description.xml', xmlBytes.length, xmlBytes));
+
+      // 2. Encode to real .hwt ZIP container
+      final zipEncoder = ZipEncoder();
+      final zipBytes = zipEncoder.encode(archive);
+      if (zipBytes == null) return;
+
+      // 3. Write to device download / themes directory
+      Directory dir;
+      if (Platform.isAndroid) {
+        dir = Directory('/storage/emulated/0/Download/ThemeStore/Custom_Themes');
+        if (!await dir.exists()) {
+          try {
+            await dir.create(recursive: true);
+          } catch (_) {
+            final ext = await getExternalStorageDirectory();
+            dir = Directory('${ext?.path}/Custom_Themes');
+            await dir.create(recursive: true);
+          }
+        }
+      } else {
+        dir = await getApplicationDocumentsDirectory();
+      }
+
+      final fileName = 'magic_custom_${DateTime.now().millisecondsSinceEpoch}.hwt';
+      final targetFile = File('${dir.path}/$fileName');
+      await targetFile.writeAsBytes(zipBytes);
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF141129),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: Color(0xFF8C52FF), width: 1.5),
           ),
-        ],
-      ),
-    );
+          title: Row(
+            children: const [
+              Icon(Icons.auto_awesome, color: Color(0xFF00D2FF)),
+              SizedBox(width: 8),
+              Text('تم تصدير حزمة .hwt بنجاح', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'تم حفظ ملف الثيم الحقيقي في مسار التخزين:\n${targetFile.path}',
+                style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1F1A3B),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0x338C52FF)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('اللون المخصص: $hexColor',
+                        style: const TextStyle(color: Color(0xFF00D2FF), fontSize: 11, fontFamily: 'monospace')),
+                    const SizedBox(height: 4),
+                    Text('نمط الأيقونات: ${_iconStyles[_selectedIconPackIndex]}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                    const SizedBox(height: 4),
+                    Text('شكل الساعة: ${_clockStyles[_selectedClockIndex]}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إغلاق', style: TextStyle(color: Color(0xFF8C52FF), fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل التصدير: $e')));
+    }
   }
 
   @override

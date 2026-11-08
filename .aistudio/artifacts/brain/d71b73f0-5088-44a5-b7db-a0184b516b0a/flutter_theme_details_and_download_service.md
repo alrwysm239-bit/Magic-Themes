@@ -71,22 +71,26 @@ class ThemeDownloadService {
       print('Warning: Failed to call increment_download RPC: $e');
     }
 
-    // 2. Obtain download URL from Supabase Storage ('themes_hwt' bucket)
+    // 2. Obtain download URL (Handles direct URLs from Option B or Supabase Storage paths)
     String downloadUrl;
-    try {
-      downloadUrl = _supabase.storage.from('themes_hwt').getPublicUrl(hwtStoragePath);
-    } catch (_) {
-      // Fallback if using signed URLs
-      downloadUrl = await _supabase.storage.from('themes_hwt').createSignedUrl(
-        hwtStoragePath,
-        60 * 60, // 1 hour validity
-      );
+    if (hwtStoragePath.startsWith('http://') || hwtStoragePath.startsWith('https://')) {
+      downloadUrl = hwtStoragePath;
+    } else {
+      try {
+        downloadUrl = _supabase.storage.from('themes').getPublicUrl(hwtStoragePath);
+      } catch (_) {
+        downloadUrl = _supabase.storage.from('themes_hwt').getPublicUrl(hwtStoragePath);
+      }
     }
 
     // 3. Prepare target destination file in /storage/emulated/0/Download/ThemeStore
     final dir = await _getThemeStoreDownloadDirectory();
     final sanitizedTitle = themeTitle.replaceAll(RegExp(r'[^\w\s\.-]'), '_').trim();
-    final fileName = sanitizedTitle.endsWith('.hwt') ? sanitizedTitle : '$sanitizedTitle.hwt';
+    final isHnt = hwtStoragePath.toLowerCase().endsWith('.hnt');
+    final ext = isHnt ? '.hnt' : '.hwt';
+    final fileName = sanitizedTitle.toLowerCase().endsWith('.hwt') || sanitizedTitle.toLowerCase().endsWith('.hnt')
+        ? sanitizedTitle
+        : '$sanitizedTitle$ext';
     final targetFile = File('${dir.path}/$fileName');
 
     // Remove old partially downloaded file if exists

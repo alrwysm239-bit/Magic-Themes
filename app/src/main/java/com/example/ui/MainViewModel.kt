@@ -147,4 +147,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleCustomizerPreviewMode() {
         repository.togglePreviewMode()
     }
+
+    // Dynamic Admin Content Operations
+    fun addTheme(theme: ThemeItem) {
+        repository.addTheme(theme)
+    }
+
+    fun deleteTheme(themeId: String) {
+        repository.deleteTheme(themeId)
+    }
+
+    fun addWallpaper(wallpaper: WallpaperItem) {
+        repository.addWallpaper(wallpaper)
+    }
+
+    fun deleteWallpaper(wallpaperId: String) {
+        repository.deleteWallpaper(wallpaperId)
+    }
+
+    fun addIconPack(iconPack: IconPackItem) {
+        repository.addIconPack(iconPack)
+    }
+
+    fun deleteIconPack(iconPackId: String) {
+        repository.deleteIconPack(iconPackId)
+    }
 }

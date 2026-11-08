@@ -437,8 +437,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   final _themeTitleController = TextEditingController();
   final _themeDescController = TextEditingController();
   final _themeCreatorController = TextEditingController(text: 'Magic Studio');
+  final _themeFileUrlController = TextEditingController();
+  final _themePreviewUrlController = TextEditingController();
   String _selectedThemeCategory = 'Cyberpunk';
   String _selectedFormat = 'hwt'; // 'hwt' or 'hnt'
+  int _themeUploadOption = 0; // 0: Option A (Pick file), 1: Option B (Direct URL)
+  int _themePreviewOption = 0; // 0: Option A (Pick image), 1: Option B (Direct URL)
   File? _pickedThemeImage;
   File? _pickedThemeFile;
   List<Map<String, dynamic>> _themesList = [];
@@ -448,7 +452,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   final _wallpaperTitleController = TextEditingController();
   final _wallpaperResolutionController = TextEditingController(text: '1440 x 3200 (QHD+)');
   final _wallpaperTagsController = TextEditingController(text: 'AMOLED, Neon, MagicOS');
+  final _wallpaperUrlController = TextEditingController();
   String _selectedWallpaperCategory = 'Live Wallpapers'; // 'Live Wallpapers', 'Wallpapers', 'Art/Design'
+  int _wallpaperUploadOption = 0; // 0: Pick image, 1: Direct URL
   File? _pickedWallpaperFile;
   List<Map<String, dynamic>> _wallpapersList = [];
 
@@ -458,6 +464,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   final _iconDeveloperController = TextEditingController(text: 'Magic Studio');
   final _iconCategoryController = TextEditingController(text: 'Neon 3D Glass');
   final _iconCountController = TextEditingController(text: '1600+ أيقونة');
+  final _iconFileUrlController = TextEditingController();
+  final _iconPreviewUrlController = TextEditingController();
+  int _iconUploadOption = 0; // 0: Pick archive, 1: Direct URL
   File? _pickedIconFile;
   File? _pickedIconPreview;
   List<Map<String, dynamic>> _iconsList = [];
@@ -475,13 +484,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     _themeTitleController.dispose();
     _themeDescController.dispose();
     _themeCreatorController.dispose();
+    _themeFileUrlController.dispose();
+    _themePreviewUrlController.dispose();
     _wallpaperTitleController.dispose();
     _wallpaperResolutionController.dispose();
     _wallpaperTagsController.dispose();
+    _wallpaperUrlController.dispose();
     _iconTitleController.dispose();
     _iconDeveloperController.dispose();
     _iconCategoryController.dispose();
     _iconCountController.dispose();
+    _iconFileUrlController.dispose();
+    _iconPreviewUrlController.dispose();
     super.dispose();
   }
 
@@ -524,7 +538,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     if (mounted) setState(() => _isCheckingRole = false);
   }
 
-  // --- Fetch Operations ---
+  // --- Fetch Operations (Pure Supabase Live Data) ---
   Future<void> _fetchThemes() async {
     try {
       final res = await _supabase.from('themes').select().order('created_at', ascending: false);
@@ -552,32 +566,62 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     }
   }
 
-  // --- 1. Theme Upload ---
+  // --- 1. Theme Upload (Dual Options: Device File / Direct URL) ---
   Future<void> _uploadTheme() async {
-    if (!_themeFormKey.currentState!.validate() || _pickedThemeImage == null || _pickedThemeFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى تحديد صورة المعاينة وملف الثيم')));
+    if (!_themeFormKey.currentState!.validate()) return;
+
+    // Validate preview source
+    if (_themePreviewOption == 0 && _pickedThemeImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار صورة المعاينة من الجهاز')));
       return;
     }
+    if (_themePreviewOption == 1 && _themePreviewUrlController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إدخال رابط صورة المعاينة المباشر')));
+      return;
+    }
+
+    // Validate file source
+    if (_themeUploadOption == 0 && _pickedThemeFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار ملف الثيم (.hwt/.hnt) من الجهاز')));
+      return;
+    }
+    if (_themeUploadOption == 1 && _themeFileUrlController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إدخال رابط ملف الثيم المباشر')));
+      return;
+    }
+
     setState(() => _isUploading = true);
 
     try {
       final ts = DateTime.now().millisecondsSinceEpoch;
-      final prevExt = _pickedThemeImage!.path.split('.').last;
-      final fileExt = _selectedFormat;
+      String prevUrl;
+      String fileUrl;
+      String sizeMb = '25.0 MB';
 
-      // Storage uploads
-      final prevPath = 'previews/$ts.$prevExt';
-      await _supabase.storage.from('previews').upload(prevPath, _pickedThemeImage!);
-      final prevUrl = _supabase.storage.from('previews').getPublicUrl(prevPath);
+      // 1. Preview Image (Option A: Storage Upload, Option B: Direct URL)
+      if (_themePreviewOption == 0 && _pickedThemeImage != null) {
+        final prevExt = _pickedThemeImage!.path.split('.').last;
+        final prevPath = 'previews/$ts.$prevExt';
+        await _supabase.storage.from('previews').upload(prevPath, _pickedThemeImage!);
+        prevUrl = _supabase.storage.from('previews').getPublicUrl(prevPath);
+      } else {
+        prevUrl = _themePreviewUrlController.text.trim();
+      }
 
-      final filePath = 'themes/$ts.$fileExt';
-      await _supabase.storage.from('themes').upload(filePath, _pickedThemeFile!);
-      final fileUrl = _supabase.storage.from('themes').getPublicUrl(filePath);
+      // 2. Theme File (Option A: Storage Upload, Option B: Direct URL)
+      if (_themeUploadOption == 0 && _pickedThemeFile != null) {
+        final fileExt = _selectedFormat;
+        final filePath = 'themes/$ts.$fileExt';
+        await _supabase.storage.from('themes').upload(filePath, _pickedThemeFile!);
+        fileUrl = _supabase.storage.from('themes').getPublicUrl(filePath);
+        sizeMb = '${(_pickedThemeFile!.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB';
+      } else {
+        fileUrl = _themeFileUrlController.text.trim();
+      }
 
-      final sizeMb = '${(_pickedThemeFile!.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB';
       final compat = _selectedFormat == 'hnt' ? 'Honor MagicOS 7/8/9 Edition' : 'Huawei EMUI 12/13/14 Edition';
 
-      // Insert DB
+      // 3. Real Supabase DB Insert
       await _supabase.from('themes').insert({
         'title': _themeTitleController.text.trim(),
         'description': _themeDescController.text.trim(),
@@ -593,12 +637,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
       _themeTitleController.clear();
       _themeDescController.clear();
+      _themeFileUrlController.clear();
+      _themePreviewUrlController.clear();
       setState(() {
         _pickedThemeImage = null;
         _pickedThemeFile = null;
       });
       await _fetchThemes();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر الثيم بنجاح!')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر الثيم بنجاح في قاعدة البيانات!')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
     } finally {
@@ -606,20 +652,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     }
   }
 
-  // --- 2. Wallpaper Upload ---
+  // --- 2. Wallpaper Upload (Dual Options: Device File / Direct URL) ---
   Future<void> _uploadWallpaper() async {
-    if (!_wallpaperFormKey.currentState!.validate() || _pickedWallpaperFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار ملف صورة الخلفية عالية الدقة')));
+    if (!_wallpaperFormKey.currentState!.validate()) return;
+
+    if (_wallpaperUploadOption == 0 && _pickedWallpaperFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار صورة الخلفية من الجهاز')));
       return;
     }
+    if (_wallpaperUploadOption == 1 && _wallpaperUrlController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إدخال رابط الصورة المباشر')));
+      return;
+    }
+
     setState(() => _isUploading = true);
 
     try {
       final ts = DateTime.now().millisecondsSinceEpoch;
-      final ext = _pickedWallpaperFile!.path.split('.').last;
-      final path = 'wallpapers/$ts.$ext';
-      await _supabase.storage.from('wallpapers').upload(path, _pickedWallpaperFile!);
-      final url = _supabase.storage.from('wallpapers').getPublicUrl(path);
+      String url;
+
+      if (_wallpaperUploadOption == 0 && _pickedWallpaperFile != null) {
+        final ext = _pickedWallpaperFile!.path.split('.').last;
+        final path = 'wallpapers/$ts.$ext';
+        await _supabase.storage.from('wallpapers').upload(path, _pickedWallpaperFile!);
+        url = _supabase.storage.from('wallpapers').getPublicUrl(path);
+      } else {
+        url = _wallpaperUrlController.text.trim();
+      }
 
       final tagsList = _wallpaperTagsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
@@ -632,9 +691,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       });
 
       _wallpaperTitleController.clear();
+      _wallpaperUrlController.clear();
       setState(() => _pickedWallpaperFile = null);
       await _fetchWallpapers();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر الخلفية بنجاح!')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر الخلفية وحفظها في قاعدة البيانات!')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
     } finally {
@@ -642,26 +702,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     }
   }
 
-  // --- 3. Icon Pack Upload ---
+  // --- 3. Icon Pack Upload (Dual Options: Device File / Direct URL) ---
   Future<void> _uploadIconPack() async {
-    if (!_iconFormKey.currentState!.validate() || _pickedIconFile == null || _pickedIconPreview == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار ملف الحزمة وصورة المعاينة')));
+    if (!_iconFormKey.currentState!.validate()) return;
+
+    if (_iconUploadOption == 0 && (_pickedIconFile == null || _pickedIconPreview == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار ملف الحزمة وصورة المعاينة من الجهاز')));
       return;
     }
+    if (_iconUploadOption == 1 && (_iconFileUrlController.text.trim().isEmpty || _iconPreviewUrlController.text.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إدخال رابط الحزمة ورابط المعاينة المباشر')));
+      return;
+    }
+
     setState(() => _isUploading = true);
 
     try {
       final ts = DateTime.now().millisecondsSinceEpoch;
-      final prevExt = _pickedIconPreview!.path.split('.').last;
-      final packExt = _pickedIconFile!.path.split('.').last;
+      String prevUrl;
+      String packUrl;
 
-      final prevPath = 'icons/prev_$ts.$prevExt';
-      await _supabase.storage.from('icons').upload(prevPath, _pickedIconPreview!);
-      final prevUrl = _supabase.storage.from('icons').getPublicUrl(prevPath);
+      if (_iconUploadOption == 0 && _pickedIconPreview != null && _pickedIconFile != null) {
+        final prevExt = _pickedIconPreview!.path.split('.').last;
+        final packExt = _pickedIconFile!.path.split('.').last;
 
-      final packPath = 'icons/pack_$ts.$packExt';
-      await _supabase.storage.from('icons').upload(packPath, _pickedIconFile!);
-      final packUrl = _supabase.storage.from('icons').getPublicUrl(packPath);
+        final prevPath = 'icons/prev_$ts.$prevExt';
+        await _supabase.storage.from('icons').upload(prevPath, _pickedIconPreview!);
+        prevUrl = _supabase.storage.from('icons').getPublicUrl(prevPath);
+
+        final packPath = 'icons/pack_$ts.$packExt';
+        await _supabase.storage.from('icons').upload(packPath, _pickedIconFile!);
+        packUrl = _supabase.storage.from('icons').getPublicUrl(packPath);
+      } else {
+        prevUrl = _iconPreviewUrlController.text.trim();
+        packUrl = _iconFileUrlController.text.trim();
+      }
 
       await _supabase.from('icons').insert({
         'title': _iconTitleController.text.trim(),
@@ -675,12 +750,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       });
 
       _iconTitleController.clear();
+      _iconFileUrlController.clear();
+      _iconPreviewUrlController.clear();
       setState(() {
         _pickedIconFile = null;
         _pickedIconPreview = null;
       });
       await _fetchIcons();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر حزمة الأيقونات بنجاح!')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر حزمة الأيقونات في قاعدة البيانات!')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
     } finally {
@@ -688,19 +765,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     }
   }
 
-  // --- Delete Handler ---
-  Future<void> _deleteItem(String table, String id, String title) async {
+  // --- Real Deletion from Database and Storage ---
+  Future<void> _deleteItem(String table, String id, String title, {String? storageBucket, String? storagePath}) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF141129),
-        title: const Text('تأكيد الحذف', style: TextStyle(color: Colors.white)),
-        content: Text('هل أنت متأكد من حذف "$title"؟', style: const TextStyle(color: Colors.white70)),
+        title: const Text('تأكيد الحذف النهائي', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text('هل أنت متأكد من حذف "$title" نهائياً من قاعدة البيانات والتخزين السحابي؟', style: const TextStyle(color: Colors.white70)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('حذف', style: TextStyle(color: Colors.redAccent)),
+            child: const Text('حذف نهائي', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -709,11 +786,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     if (confirmed != true) return;
 
     try {
+      // 1. Delete from Supabase Database
       await _supabase.from(table).delete().eq('id', id);
+
+      // 2. Delete from Supabase Storage if path exists
+      if (storageBucket != null && storagePath != null && storagePath.isNotEmpty) {
+        try {
+          await _supabase.storage.from(storageBucket).remove([storagePath]);
+        } catch (_) {}
+      }
+
+      // 3. Instant UI refresh
       if (table == 'themes') await _fetchThemes();
       if (table == 'wallpapers') await _fetchWallpapers();
       if (table == 'icons') await _fetchIcons();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحذف بنجاح')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحذف النهائي بنجاح')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحذف: $e')));
     }
@@ -850,37 +937,87 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     decoration: _inputDecoration('وصف الثيم والمميزات'),
                   ),
                   const SizedBox(height: 14),
+                  // --- خيار صورة المعاينة (Option A / Option B) ---
+                  const Text('طريقة إرفاق صورة المعاينة:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final res = await FilePicker.platform.pickFiles(type: FileType.image);
-                            if (res != null && res.files.single.path != null) {
-                              setState(() => _pickedThemeImage = File(res.files.single.path!));
-                            }
-                          },
-                          icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
-                          label: Text(_pickedThemeImage != null ? 'تم اختيار الصورة' : 'صورة المعاينة', style: const TextStyle(color: Colors.white, fontSize: 11)),
-                        ),
+                      ChoiceChip(
+                        label: const Text('ملف من الجهاز (Option A)', style: TextStyle(fontSize: 11)),
+                        selected: _themePreviewOption == 'file',
+                        onSelected: (v) => setState(() => _themePreviewOption = 'file'),
+                        selectedColor: const Color(0xFF00D2FF),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final res = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['hwt', 'hnt', 'zip']);
-                            if (res != null && res.files.single.path != null) {
-                              setState(() => _pickedThemeFile = File(res.files.single.path!));
-                            }
-                          },
-                          icon: const Icon(Icons.archive, color: Color(0xFF8C52FF)),
-                          label: Text(_pickedThemeFile != null ? 'تم اختيار الملف' : 'ملف الثيم', style: const TextStyle(color: Colors.white, fontSize: 11)),
-                        ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('رابط مباشر URL (Option B)', style: TextStyle(fontSize: 11)),
+                        selected: _themePreviewOption == 'url',
+                        onSelected: (v) => setState(() => _themePreviewOption = 'url'),
+                        selectedColor: const Color(0xFF00D2FF),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  if (_themePreviewOption == 'file')
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+                      onPressed: () async {
+                        final res = await FilePicker.platform.pickFiles(type: FileType.image);
+                        if (res != null && res.files.single.path != null) {
+                          setState(() => _pickedThemeImage = File(res.files.single.path!));
+                        }
+                      },
+                      icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
+                      label: Text(_pickedThemeImage != null ? 'تم اختيار الصورة: ${_pickedThemeImage!.path.split("/").last}' : 'اختيار صورة المعاينة من الجهاز', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    )
+                  else
+                    TextFormField(
+                      controller: _themePreviewUrlController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _inputDecoration('رابط صورة المعاينة المباشر (https://...)'),
+                    ),
+                  const SizedBox(height: 14),
+                  // --- خيار ملف الثيم (.hwt / .hnt) (Option A / Option B) ---
+                  const Text('طريقة إرفاق ملف الثيم (.hwt/.hnt):', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text('ملف من الجهاز (Option A)', style: TextStyle(fontSize: 11)),
+                        selected: _themeUploadOption == 'file',
+                        onSelected: (v) => setState(() => _themeUploadOption = 'file'),
+                        selectedColor: const Color(0xFF8C52FF),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('رابط تحميل مباشر URL (Option B)', style: TextStyle(fontSize: 11)),
+                        selected: _themeUploadOption == 'url',
+                        onSelected: (v) => setState(() => _themeUploadOption = 'url'),
+                        selectedColor: const Color(0xFF8C52FF),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (_themeUploadOption == 'file')
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+                      onPressed: () async {
+                        final res = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['hwt', 'hnt', 'zip']);
+                        if (res != null && res.files.single.path != null) {
+                          setState(() => _pickedThemeFile = File(res.files.single.path!));
+                        }
+                      },
+                      icon: const Icon(Icons.archive, color: Color(0xFF8C52FF)),
+                      label: Text(_pickedThemeFile != null ? 'تم اختيار الملف: ${_pickedThemeFile!.path.split("/").last}' : 'اختيار ملف الثيم (.hwt/.hnt) من الجهاز', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    )
+                  else
+                    TextFormField(
+                      controller: _themeFileUrlController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _inputDecoration('رابط ملف الثيم المباشر (https://.../theme.hwt)'),
+                    ),
                   const SizedBox(height: 16),
-                  _buildSubmitButton('رفع ونشر الثيم', _uploadTheme),
+                  _buildSubmitButton('رفع ونشر الثيم إلى Supabase', _uploadTheme),
                 ],
               ),
             ),
@@ -943,7 +1080,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   TextFormField(
                     controller: _wallpaperResolutionController,
                     style: const TextStyle(color: Colors.white),
-                    decoration: _inputDecoration('دقة العرض (Resolution)'),
+                    decoration: _inputDecoration('دقة العرض (مثال: 4K Ultra HD)'),
                   ),
                   const SizedBox(height: 10),
                   TextFormField(
@@ -952,19 +1089,47 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     decoration: _inputDecoration('الوسوم (مفصولة بفاصلة)'),
                   ),
                   const SizedBox(height: 14),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                    onPressed: () async {
-                      final res = await FilePicker.platform.pickFiles(type: FileType.image);
-                      if (res != null && res.files.single.path != null) {
-                        setState(() => _pickedWallpaperFile = File(res.files.single.path!));
-                      }
-                    },
-                    icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
-                    label: Text(_pickedWallpaperFile != null ? 'تم اختيار الخلفية' : 'اختيار صورة الخلفية', style: const TextStyle(color: Colors.white)),
+                  // --- خيار رفع الخلفية (Option A / Option B) ---
+                  const Text('طريقة رفع صورة الخلفية:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text('صورة من الجهاز (Option A)', style: TextStyle(fontSize: 11)),
+                        selected: _wallpaperUploadOption == 'file',
+                        onSelected: (v) => setState(() => _wallpaperUploadOption = 'file'),
+                        selectedColor: const Color(0xFF00D2FF),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('رابط مباشر URL (Option B)', style: TextStyle(fontSize: 11)),
+                        selected: _wallpaperUploadOption == 'url',
+                        onSelected: (v) => setState(() => _wallpaperUploadOption = 'url'),
+                        selectedColor: const Color(0xFF00D2FF),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 8),
+                  if (_wallpaperUploadOption == 'file')
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
+                      onPressed: () async {
+                        final res = await FilePicker.platform.pickFiles(type: FileType.image);
+                        if (res != null && res.files.single.path != null) {
+                          setState(() => _pickedWallpaperFile = File(res.files.single.path!));
+                        }
+                      },
+                      icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
+                      label: Text(_pickedWallpaperFile != null ? 'تم اختيار الخلفية: ${_pickedWallpaperFile!.path.split("/").last}' : 'اختيار صورة الخلفية من الجهاز', style: const TextStyle(color: Colors.white)),
+                    )
+                  else
+                    TextFormField(
+                      controller: _wallpaperUrlController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _inputDecoration('رابط الصورة المباشر (https://.../wallpaper.jpg)'),
+                    ),
                   const SizedBox(height: 16),
-                  _buildSubmitButton('رفع ونشر الخلفية', _uploadWallpaper),
+                  _buildSubmitButton('رفع ونشر الخلفية إلى Supabase', _uploadWallpaper),
                 ],
               ),
             ),
@@ -1018,43 +1183,81 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         child: TextFormField(
                           controller: _iconCountController,
                           style: const TextStyle(color: Colors.white),
-                          decoration: _inputDecoration('عدد الأيقونات'),
+                          decoration: _inputDecoration('عدد الأيقونات (مثال: +1800)'),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
+                  // --- خيار رفع حزمة الأيقونات (Option A / Option B) ---
+                  const Text('طريقة إرفاق ملفات الأيقونات:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final res = await FilePicker.platform.pickFiles(type: FileType.image);
-                            if (res != null && res.files.single.path != null) {
-                              setState(() => _pickedIconPreview = File(res.files.single.path!));
-                            }
-                          },
-                          icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
-                          label: Text(_pickedIconPreview != null ? 'تم اختيار المعاينة' : 'صورة المعاينة', style: const TextStyle(color: Colors.white, fontSize: 11)),
-                        ),
+                      ChoiceChip(
+                        label: const Text('ملفات من الجهاز (Option A)', style: TextStyle(fontSize: 11)),
+                        selected: _iconUploadOption == 'file',
+                        onSelected: (v) => setState(() => _iconUploadOption = 'file'),
+                        selectedColor: const Color(0xFF8C52FF),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final res = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip', 'hwt', 'hnt']);
-                            if (res != null && res.files.single.path != null) {
-                              setState(() => _pickedIconFile = File(res.files.single.path!));
-                            }
-                          },
-                          icon: const Icon(Icons.archive, color: Color(0xFF8C52FF)),
-                          label: Text(_pickedIconFile != null ? 'تم اختيار الحزمة' : 'ملف الحزمة', style: const TextStyle(color: Colors.white, fontSize: 11)),
-                        ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('روابط مباشرة URL (Option B)', style: TextStyle(fontSize: 11)),
+                        selected: _iconUploadOption == 'url',
+                        onSelected: (v) => setState(() => _iconUploadOption = 'url'),
+                        selectedColor: const Color(0xFF8C52FF),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  if (_iconUploadOption == 'file')
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final res = await FilePicker.platform.pickFiles(type: FileType.image);
+                              if (res != null && res.files.single.path != null) {
+                                setState(() => _pickedIconPreview = File(res.files.single.path!));
+                              }
+                            },
+                            icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
+                            label: Text(_pickedIconPreview != null ? 'تم اختيار المعاينة' : 'صورة المعاينة', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final res = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip', 'hwt', 'hnt']);
+                              if (res != null && res.files.single.path != null) {
+                                setState(() => _pickedIconFile = File(res.files.single.path!));
+                              }
+                            },
+                            icon: const Icon(Icons.archive, color: Color(0xFF8C52FF)),
+                            label: Text(_pickedIconFile != null ? 'تم اختيار الحزمة' : 'ملف الحزمة (ZIP)', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Column(
+                      children: [
+                        TextFormField(
+                          controller: _iconPreviewUrlController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _inputDecoration('رابط صورة المعاينة (https://.../preview.png)'),
+                        ),
+                        const SizedBox(height: 10),
+                        TextFormField(
+                          controller: _iconFileUrlController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _inputDecoration('رابط ملف الحزمة المباشر (https://.../icons.zip)'),
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: 16),
-                  _buildSubmitButton('رفع ونشر حزمة الأيقونات', _uploadIconPack),
+                  _buildSubmitButton('رفع ونشر حزمة الأيقونات إلى Supabase', _uploadIconPack),
                 ],
               ),
             ),

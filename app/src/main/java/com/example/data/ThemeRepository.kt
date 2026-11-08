@@ -270,6 +270,30 @@ class ThemeRepository {
         )
     }
 
+    fun addTheme(theme: ThemeItem) {
+        _themes.update { listOf(theme) + it }
+    }
+
+    fun deleteTheme(themeId: String) {
+        _themes.update { list -> list.filter { it.id != themeId } }
+    }
+
+    fun addWallpaper(wallpaper: WallpaperItem) {
+        _wallpapers.update { listOf(wallpaper) + it }
+    }
+
+    fun deleteWallpaper(wallpaperId: String) {
+        _wallpapers.update { list -> list.filter { it.id != wallpaperId } }
+    }
+
+    fun addIconPack(iconPack: IconPackItem) {
+        _iconPacks.update { listOf(iconPack) + it }
+    }
+
+    fun deleteIconPack(iconPackId: String) {
+        _iconPacks.update { list -> list.filter { it.id != iconPackId } }
+    }
+
     fun toggleFavoriteTheme(themeId: String) {
         _themes.update { list ->
             list.map { if (it.id == themeId) it.copy(isFavorite = !it.isFavorite) else it }

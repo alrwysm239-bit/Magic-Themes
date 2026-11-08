@@ -186,6 +186,15 @@ fun ThemeStoreApp(
                                             isAdmin = isAdmin,
                                             onLogin = { viewModel.loginUser(it) },
                                             onLogout = { viewModel.logoutUser() },
+                                            themes = themes,
+                                            wallpapers = wallpapers,
+                                            iconPacks = iconPacks,
+                                            onAddTheme = { viewModel.addTheme(it) },
+                                            onDeleteTheme = { viewModel.deleteTheme(it) },
+                                            onAddWallpaper = { viewModel.addWallpaper(it) },
+                                            onDeleteWallpaper = { viewModel.deleteWallpaper(it) },
+                                            onAddIconPack = { viewModel.addIconPack(it) },
+                                            onDeleteIconPack = { viewModel.deleteIconPack(it) },
                                             onLanguageChanged = { viewModel.setLanguage(it) }
                                         )
                                     }
