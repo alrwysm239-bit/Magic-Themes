@@ -659,6 +659,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Prominent Quick File Manager Upload Button for Admin
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF8C52FF), Color(0xFF00D2FF)]),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                ),
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (ctx) => const MemberUploadBottomSheet(),
+                  );
+                },
+                icon: const Icon(Icons.cloud_upload, color: Colors.white),
+                label: const Text(
+                  'استيراد ورفع من مدير الملفات (Themes, Wallpapers, Icons)',
+                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+
             // Upload Form Card
             Container(
               padding: const EdgeInsets.all(18),
@@ -891,6 +921,7 @@ class MainTabContainer extends StatefulWidget {
 
 class _MainTabContainerState extends State<MainTabContainer> {
   int _currentIndex = 0;
+  bool _isAdmin = false;
 
   final List<Widget> _screens = const [
     HomeScreen(),
@@ -901,6 +932,17 @@ class _MainTabContainerState extends State<MainTabContainer> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _checkAdminStatus();
+  }
+
+  Future<void> _checkAdminStatus() async {
+    final isAdmin = await AuthService().isAdmin();
+    if (mounted) setState(() => _isAdmin = isAdmin);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
@@ -909,6 +951,25 @@ class _MainTabContainerState extends State<MainTabContainer> {
         index: _currentIndex,
         children: _screens,
       ),
+      // Strictly visible only for authenticated Admins. Completely hidden from regular members!
+      floatingActionButton: (_isAdmin && _currentIndex != 4)
+          ? FloatingActionButton.extended(
+              backgroundColor: const Color(0xFF8C52FF),
+              icon: const Icon(Icons.cloud_upload, color: Color(0xFF00D2FF)),
+              label: const Text(
+                'رفع ملفات (إدارة)',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (ctx) => const MemberUploadBottomSheet(),
+                );
+              },
+            )
+          : null,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: const Color(0xE60E0B22),
@@ -931,6 +992,310 @@ class _MainTabContainerState extends State<MainTabContainer> {
             BottomNavigationBarItem(icon: const Icon(Icons.grid_view_rounded), label: l10n.translate('tab_icons')),
             BottomNavigationBarItem(icon: const Icon(Icons.auto_awesome), label: l10n.translate('tab_customizer')),
             BottomNavigationBarItem(icon: const Icon(Icons.menu), label: l10n.translate('tab_menu')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// Member Upload Bottom Sheet (File Manager)
+// ==========================================
+class MemberUploadBottomSheet extends StatefulWidget {
+  const MemberUploadBottomSheet({super.key});
+
+  @override
+  State<MemberUploadBottomSheet> createState() => _MemberUploadBottomSheetState();
+}
+
+class _MemberUploadBottomSheetState extends State<MemberUploadBottomSheet> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final SupabaseClient _supabase = Supabase.instance.client;
+  bool _isUploading = false;
+
+  final _titleController = TextEditingController();
+  final _creatorController = TextEditingController(text: 'عضو Magic Themes');
+  final _descController = TextEditingController();
+
+  PlatformFile? _pickedFile;
+  PlatformFile? _pickedPreviewImage;
+  String _themeFormat = 'hwt';
+  String _wallpaperCategory = 'Live Wallpapers';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _titleController.dispose();
+    _creatorController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickFromFileManager() async {
+    final int index = _tabController.index;
+    FilePickerResult? result;
+
+    if (index == 0) {
+      // Themes: .hwt, .hnt, .zip
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['hwt', 'hnt', 'zip'],
+        withData: true,
+      );
+    } else if (index == 1) {
+      // Wallpapers: images
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+        withData: true,
+      );
+    } else {
+      // Icons: .zip, .hwt, .hnt
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['zip', 'hwt', 'hnt'],
+        withData: true,
+      );
+    }
+
+    if (result != null && result.files.isNotEmpty) {
+      setState(() {
+        _pickedFile = result!.files.single;
+        if (_pickedFile!.name.toLowerCase().endsWith('.hnt')) {
+          _themeFormat = 'hnt';
+        } else if (_pickedFile!.name.toLowerCase().endsWith('.hwt')) {
+          _themeFormat = 'hwt';
+        }
+        if (_titleController.text.isEmpty) {
+          _titleController.text = _pickedFile!.name.split('.').first;
+        }
+      });
+    }
+  }
+
+  Future<void> _pickPreviewImage() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+      withData: true,
+    );
+    if (result != null && result.files.isNotEmpty) {
+      setState(() => _pickedPreviewImage = result.files.single);
+    }
+  }
+
+  Future<void> _submitUpload() async {
+    if (_pickedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى اختيار الملف أولاً من مدير الملفات')),
+      );
+      return;
+    }
+
+    setState(() => _isUploading = true);
+
+    try {
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final bytes = _pickedFile!.bytes ?? (await File(_pickedFile!.path!).readAsBytes());
+      final index = _tabController.index;
+
+      if (index == 0) {
+        // Upload Theme (.hwt / .hnt)
+        final filePath = 'themes/$ts.${_themeFormat}';
+        await _supabase.storage.from('themes').uploadBinary(
+          filePath,
+          bytes,
+          fileOptions: const FileOptions(upsert: true, contentType: 'application/octet-stream'),
+        );
+        final fileUrl = _supabase.storage.from('themes').getPublicUrl(filePath);
+
+        String previewUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80';
+        if (_pickedPreviewImage != null) {
+          final prevBytes = _pickedPreviewImage!.bytes ?? (await File(_pickedPreviewImage!.path!).readAsBytes());
+          final prevExt = _pickedPreviewImage!.extension ?? 'jpg';
+          final prevPath = 'previews/$ts.$prevExt';
+          await _supabase.storage.from('previews').uploadBinary(prevPath, prevBytes);
+          previewUrl = _supabase.storage.from('previews').getPublicUrl(prevPath);
+        }
+
+        await _supabase.from('themes').insert({
+          'title': _titleController.text.trim().isEmpty ? 'ثيم جديد' : _titleController.text.trim(),
+          'description': _descController.text.trim(),
+          'creator': _creatorController.text.trim(),
+          'category': 'Community',
+          'format': _themeFormat,
+          'preview_url': previewUrl,
+          'theme_file_url': fileUrl,
+          'size_mb': '${(_pickedFile!.size / (1024 * 1024)).toStringAsFixed(1)} MB',
+          'compatible_versions': _themeFormat == 'hnt' ? 'Honor MagicOS' : 'Huawei EMUI',
+          'rating': 5.0,
+        });
+      } else if (index == 1) {
+        // Upload Wallpaper
+        final ext = _pickedFile!.extension ?? 'jpg';
+        final path = 'wallpapers/$ts.$ext';
+        await _supabase.storage.from('wallpapers').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(upsert: true, contentType: 'image/$ext'),
+        );
+        final url = _supabase.storage.from('wallpapers').getPublicUrl(path);
+
+        await _supabase.from('wallpapers').insert({
+          'title': _titleController.text.trim().isEmpty ? 'خلفية جديدة' : _titleController.text.trim(),
+          'category': _wallpaperCategory,
+          'resolution': '1440 x 3200 (QHD+)',
+          'image_url': url,
+          'tags': ['Community', 'Honor', 'Huawei'],
+        });
+      } else {
+        // Upload Icons Pack
+        final ext = _pickedFile!.extension ?? 'zip';
+        final path = 'icons/pack_$ts.$ext';
+        await _supabase.storage.from('icons').uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(upsert: true, contentType: 'application/zip'),
+        );
+        final url = _supabase.storage.from('icons').getPublicUrl(path);
+
+        await _supabase.from('icons').insert({
+          'title': _titleController.text.trim().isEmpty ? 'حزمة أيقونات' : _titleController.text.trim(),
+          'developer': _creatorController.text.trim(),
+          'category': 'Neon Style',
+          'icons_count': 1600,
+          'preview_url': 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80',
+          'package_file_url': url,
+          'compatible_versions': 'MagicOS & EMUI',
+          'rating': 5.0,
+        });
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم رفع وإضافة الملف بنجاح! وظهر الآن للأعضاء.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(
+        top: 20,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFF141129),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        border: Border(top: BorderSide(color: Color(0xFF8C52FF), width: 1.5)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'رفع من مدير الملفات للأعضاء',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: Colors.white70),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TabBar(
+              controller: _tabController,
+              indicatorColor: const Color(0xFF00D2FF),
+              labelColor: const Color(0xFF00D2FF),
+              unselectedLabelColor: Colors.white60,
+              tabs: const [
+                Tab(icon: Icon(Icons.style, size: 20), text: 'ثيمات'),
+                Tab(icon: Icon(Icons.wallpaper, size: 20), text: 'خلفيات'),
+                Tab(icon: Icon(Icons.palette, size: 20), text: 'أيقونات'),
+              ],
+            ),
+            const SizedBox(height: 18),
+            // Select from device button
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                side: const BorderSide(color: Color(0xFF00D2FF), width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              onPressed: _pickFromFileManager,
+              icon: const Icon(Icons.folder_open, color: Color(0xFF00D2FF)),
+              label: Text(
+                _pickedFile != null
+                    ? 'تم اختيار: ${_pickedFile!.name} (${(_pickedFile!.size / (1024 * 1024)).toStringAsFixed(1)} MB)'
+                    : 'اضغط لفتح مدير الملفات في هاتفك',
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _titleController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'العنوان / الاسم',
+                labelStyle: const TextStyle(color: Colors.white70),
+                filled: true,
+                fillColor: const Color(0xFF1E193C),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _creatorController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'اسم المصمم / العضو',
+                labelStyle: const TextStyle(color: Colors.white70),
+                filled: true,
+                fillColor: const Color(0xFF1E193C),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF8C52FF),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                ),
+                onPressed: _isUploading ? null : _submitUpload,
+                child: _isUploading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        'تأكيد الرفع والإضافة الفورية',
+                        style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
+              ),
+            ),
           ],
         ),
       ),

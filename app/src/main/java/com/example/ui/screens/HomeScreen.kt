@@ -27,6 +27,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -59,6 +62,7 @@ import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.NeonAmber
 import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonPurple
+import com.example.ui.theme.NeonPurpleCyanBrush
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
@@ -71,6 +75,8 @@ fun HomeScreen(
     onThemeClick: (ThemeItem) -> Unit,
     onCategoryClick: (String) -> Unit,
     onQuickBubbleClick: (String) -> Unit,
+    onOpenUploadClick: () -> Unit = {},
+    isAdmin: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
@@ -149,6 +155,80 @@ fun HomeScreen(
             QuickCategoryBubblesRow(
                 onBubbleClick = onQuickBubbleClick
             )
+        }
+
+        // Member Upload Invitation Card (Strictly visible only for logged-in Admin)
+        if (isAdmin) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 6.dp)
+                        .clickable { onOpenUploadClick() }
+                        .testTag("home_member_upload_card"),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161230)),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = NeonPurpleCyanBrush,
+                        width = 1.2.dp
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Brush.linearGradient(listOf(NeonPurple, NeonCyan))),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudUpload,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "رفع ثيمات أو خلفيات من جهازك (إدارة)",
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "استيراد ملفات .hwt و .hnt والخلفيات مباشرة عبر مدير الملفات",
+                                    color = TextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(NeonPurple.copy(alpha = 0.25f))
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "استيراد",
+                                color = NeonCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // Section: "الثيمات الأكثر شعبية" / Popular Themes

@@ -5,35 +5,53 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.BottomNavBar
+import com.example.ui.components.MemberUploadDialog
 import com.example.ui.components.NavTab
 import com.example.ui.screens.CategoriesScreen
 import com.example.ui.screens.CustomizerScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.IconsScreen
 import com.example.ui.screens.MenuScreen
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalLayoutDirection
 import com.example.ui.screens.MyContentScreen
 import com.example.ui.screens.ThemeDetailsScreen
 import com.example.ui.screens.WallpapersScreen
+import com.example.ui.theme.AppLanguage
 import com.example.ui.theme.ArabicStrings
+import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.EnglishStrings
 import com.example.ui.theme.FrenchStrings
 import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.LocalCurrentLanguage
-import com.example.ui.theme.AppLanguage
-import com.example.ui.theme.DarkBackground
+import com.example.ui.theme.NeonCyan
+import com.example.ui.theme.NeonPurple
 
 @Composable
 fun ThemeStoreApp(
@@ -52,6 +70,7 @@ fun ThemeStoreApp(
     val currentLanguage by viewModel.currentLanguage.collectAsStateWithLifecycle()
     val currentUserEmail by viewModel.currentUserEmail.collectAsStateWithLifecycle()
     val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
+    var showMemberUploadDialog by remember { mutableStateOf(false) }
 
     val currentStrings = when (currentLanguage) {
         AppLanguage.ARABIC -> ArabicStrings
@@ -69,6 +88,34 @@ fun ThemeStoreApp(
                 .fillMaxSize()
                 .background(DarkBackground),
             containerColor = DarkBackground,
+            floatingActionButton = {
+                // Strictly visible only for verified logged-in Admins
+                if (isAdmin && currentSubScreen == AppSubScreen.NONE && selectedTab != NavTab.MENU) {
+                    ExtendedFloatingActionButton(
+                        onClick = { showMemberUploadDialog = true },
+                        containerColor = NeonPurple,
+                        contentColor = Color.White,
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier
+                            .testTag("fab_member_upload")
+                            .border(1.dp, NeonCyan.copy(alpha = 0.5f), RoundedCornerShape(24.dp)),
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.CloudUpload,
+                                contentDescription = "رفع من مدير الملفات",
+                                tint = NeonCyan
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = "رفع من الملفات",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    )
+                }
+            },
             bottomBar = {
                 if (currentSubScreen == AppSubScreen.NONE) {
                     BottomNavBar(
@@ -142,7 +189,9 @@ fun ThemeStoreApp(
                                                     "video" -> viewModel.selectTab(NavTab.WALLPAPERS)
                                                     "best" -> viewModel.openCategories("Cyberpunk")
                                                 }
-                                            }
+                                            },
+                                            onOpenUploadClick = { showMemberUploadDialog = true },
+                                            isAdmin = isAdmin
                                         )
                                     }
 
@@ -195,7 +244,8 @@ fun ThemeStoreApp(
                                             onDeleteWallpaper = { viewModel.deleteWallpaper(it) },
                                             onAddIconPack = { viewModel.addIconPack(it) },
                                             onDeleteIconPack = { viewModel.deleteIconPack(it) },
-                                            onLanguageChanged = { viewModel.setLanguage(it) }
+                                            onLanguageChanged = { viewModel.setLanguage(it) },
+                                            onOpenUploadClick = { showMemberUploadDialog = true }
                                         )
                                     }
                                 }
@@ -206,5 +256,23 @@ fun ThemeStoreApp(
             }
         }
     )
+
+        if (showMemberUploadDialog) {
+            MemberUploadDialog(
+                onDismissRequest = { showMemberUploadDialog = false },
+                onAddTheme = {
+                    viewModel.addTheme(it)
+                    showMemberUploadDialog = false
+                },
+                onAddWallpaper = {
+                    viewModel.addWallpaper(it)
+                    showMemberUploadDialog = false
+                },
+                onAddIconPack = {
+                    viewModel.addIconPack(it)
+                    showMemberUploadDialog = false
+                }
+            )
+        }
     }
 }

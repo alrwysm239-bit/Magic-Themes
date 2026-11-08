@@ -107,6 +107,7 @@ fun MenuScreen(
     onAddIconPack: (IconPackItem) -> Unit = {},
     onDeleteIconPack: (String) -> Unit = {},
     onLanguageChanged: (AppLanguage) -> Unit = {},
+    onOpenUploadClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -978,6 +979,78 @@ fun MenuScreen(
                             }
                         }
 
+                        // Prominent Button: Upload & Import via Device File Manager for Admin
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFF201640))
+                                .border(
+                                    1.5.dp,
+                                    Brush.horizontalGradient(listOf(NeonPurple, NeonCyan)),
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .clickable {
+                                    showAdminDashboardDialog = false
+                                    onOpenUploadClick()
+                                }
+                                .testTag("admin_file_manager_upload_btn")
+                                .padding(14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(CircleShape)
+                                            .background(Brush.linearGradient(listOf(NeonPurple, NeonCyan))),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CloudUpload,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "رفع واستيراد من مدير الملفات",
+                                            color = TextPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "اختر ملفات .hwt و .hnt أو خلفيات أو حزم أيقونات من جهازك",
+                                            color = TextSecondary,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(NeonCyan.copy(alpha = 0.2f))
+                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "فتح",
+                                        color = NeonCyan,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
                         // 3 Admin Navigation Tabs (Themes, Wallpapers, Icons)
                         Row(
                             modifier = Modifier
@@ -1145,13 +1218,24 @@ fun MenuScreen(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(Color(0xFF1A1535))
-                                        .border(1.dp, Color(0x338C52FF), RoundedCornerShape(10.dp))
+                                        .border(1.dp, NeonCyan.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            showAdminDashboardDialog = false
+                                            onOpenUploadClick()
+                                        }
                                         .padding(10.dp)
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.FolderSpecial, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("الملف المحدد: storage/download/theme.$selectedFormat", color = TextSecondary, fontSize = 11.sp)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.FolderSpecial, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("اختيار ملف .$selectedFormat من مدير الملفات", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                        Text("تصفح الجهاز", color = NeonCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -1291,6 +1375,32 @@ fun MenuScreen(
                                         unfocusedBorderColor = Color(0x448C52FF)
                                     )
                                 )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF1A1535))
+                                        .border(1.dp, NeonCyan.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            showAdminDashboardDialog = false
+                                            onOpenUploadClick()
+                                        }
+                                        .padding(10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Image, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("اختيار صورة خلفية من مدير الملفات", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                        Text("تصفح الصور", color = NeonCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
 
                             OutlinedTextField(
@@ -1405,6 +1515,32 @@ fun MenuScreen(
                                         unfocusedBorderColor = Color(0x448C52FF)
                                     )
                                 )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF1A1535))
+                                        .border(1.dp, NeonCyan.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            showAdminDashboardDialog = false
+                                            onOpenUploadClick()
+                                        }
+                                        .padding(10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Dashboard, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("اختيار ملف حزمة الأيقونات من مدير الملفات", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                        Text("تصفح الأرشيف", color = NeonCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
 
                             Row(

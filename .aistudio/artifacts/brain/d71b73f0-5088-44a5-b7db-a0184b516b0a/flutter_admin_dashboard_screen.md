@@ -406,6 +406,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
 ```dart
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -443,8 +444,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   String _selectedFormat = 'hwt'; // 'hwt' or 'hnt'
   String _themeUploadOption = 'file'; // 'file' (Option A: Pick from storage), 'url' (Option B: Direct URL)
   String _themePreviewOption = 'file'; // 'file' (Option A: Pick from storage), 'url' (Option B: Direct URL)
-  File? _pickedThemeImage;
-  File? _pickedThemeFile;
+  PlatformFile? _pickedThemeImage;
+  PlatformFile? _pickedThemeFile;
   List<Map<String, dynamic>> _themesList = [];
 
   // 2. Wallpapers State
@@ -455,7 +456,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   final _wallpaperUrlController = TextEditingController();
   String _selectedWallpaperCategory = 'Live Wallpapers'; // 'Live Wallpapers', 'Wallpapers', 'Art/Design'
   String _wallpaperUploadOption = 'file'; // 'file' (Option A: Pick from storage), 'url' (Option B: Direct URL)
-  File? _pickedWallpaperFile;
+  PlatformFile? _pickedWallpaperFile;
   List<Map<String, dynamic>> _wallpapersList = [];
 
   // 3. Icons State
@@ -467,8 +468,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   final _iconFileUrlController = TextEditingController();
   final _iconPreviewUrlController = TextEditingController();
   String _iconUploadOption = 'file'; // 'file' (Option A: Pick from storage), 'url' (Option B: Direct URL)
-  File? _pickedIconFile;
-  File? _pickedIconPreview;
+  PlatformFile? _pickedIconFile;
+  PlatformFile? _pickedIconPreview;
   List<Map<String, dynamic>> _iconsList = [];
 
   @override
@@ -566,7 +567,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     }
   }
 
-  // --- 1. Theme Upload (Dual Options: Device File / Direct URL) ---
   // Helper to extract relative storage path from a Supabase public URL
   String? _extractPathFromUrl(String? url, String bucket) {
     if (url == null || url.isEmpty) return null;
@@ -578,7 +578,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     return null;
   }
 
-  // --- 1. Theme Upload (Dual Options: Device File / Direct URL) ---
+  // Helper to reliably retrieve binary bytes from PlatformFile across Android/iOS/Web
+  Future<Uint8List> _getFileBytes(PlatformFile file) async {
+    if (file.bytes != null && file.bytes!.isNotEmpty) {
+      return file.bytes!;
+    }
+    if (file.path != null && file.path!.isNotEmpty) {
+      final ioFile = File(file.path!);
+      if (await ioFile.exists()) {
+        return await ioFile.readAsBytes();
+      }
+    }
+    throw Exception('تعذر قراءة بيانات الملف الثنائية (${file.name})');
+  }
+
+  // Helper to determine accurate content type
+  String _getContentType(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      case 'hwt':
+      case 'hnt':
+      case 'zip':
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  // --- 1. Theme Upload (Dual Options: Real Binary Upload / Direct URL) ---
   Future<void> _uploadTheme() async {
     if (!_themeFormKey.currentState!.validate()) return;
 
@@ -610,31 +644,38 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       String fileUrl;
       String sizeMb = '25.0 MB';
 
-      // 1. Preview Image (Option A: Storage Upload, Option B: Direct URL)
+      // 1. Preview Image (Option A: Storage Binary Upload, Option B: Direct URL)
       if (_themePreviewOption == 'file' && _pickedThemeImage != null) {
-        final prevExt = _pickedThemeImage!.path.split('.').last;
+        final imageBytes = await _getFileBytes(_pickedThemeImage!);
+        final prevExt = _pickedThemeImage!.extension ?? 'jpg';
         final prevPath = 'previews/$ts.$prevExt';
-        await _supabase.storage.from('previews').upload(
+        
+        // Real Supabase Storage Binary Upload
+        await _supabase.storage.from('previews').uploadBinary(
           prevPath,
-          _pickedThemeImage!,
-          fileOptions: const FileOptions(upsert: true),
+          imageBytes,
+          fileOptions: FileOptions(upsert: true, contentType: _getContentType(prevExt)),
         );
         prevUrl = _supabase.storage.from('previews').getPublicUrl(prevPath);
       } else {
         prevUrl = _themePreviewUrlController.text.trim();
       }
 
-      // 2. Theme File (Option A: Storage Upload, Option B: Direct URL)
+      // 2. Theme Package File (.hwt / .hnt) (Option A: Storage Binary Upload, Option B: Direct URL)
       if (_themeUploadOption == 'file' && _pickedThemeFile != null) {
+        final fileBytes = await _getFileBytes(_pickedThemeFile!);
         final fileExt = _selectedFormat;
         final filePath = 'themes/$ts.$fileExt';
-        await _supabase.storage.from('themes').upload(
+
+        // Real Supabase Storage Binary Upload (.hwt / .hnt package)
+        await _supabase.storage.from('themes').uploadBinary(
           filePath,
-          _pickedThemeFile!,
-          fileOptions: const FileOptions(upsert: true),
+          fileBytes,
+          fileOptions: const FileOptions(upsert: true, contentType: 'application/octet-stream'),
         );
         fileUrl = _supabase.storage.from('themes').getPublicUrl(filePath);
-        sizeMb = '${(_pickedThemeFile!.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB';
+        final fileSize = _pickedThemeFile!.size;
+        sizeMb = '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
       } else {
         fileUrl = _themeFileUrlController.text.trim();
       }
@@ -664,15 +705,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         _pickedThemeFile = null;
       });
       await _fetchThemes();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر الثيم بنجاح في قاعدة البيانات!')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر وحفظ الثيم بنجاح في قاعدة بيانات Supabase!')));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع السحابي: $e')));
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
   }
 
-  // --- 2. Wallpaper Upload (Dual Options: Device File / Direct URL) ---
+  // --- 2. Wallpaper Upload (Dual Options: Real Binary Upload / Direct URL) ---
   Future<void> _uploadWallpaper() async {
     if (!_wallpaperFormKey.currentState!.validate()) return;
 
@@ -692,12 +733,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       String url;
 
       if (_wallpaperUploadOption == 'file' && _pickedWallpaperFile != null) {
-        final ext = _pickedWallpaperFile!.path.split('.').last;
+        final imageBytes = await _getFileBytes(_pickedWallpaperFile!);
+        final ext = _pickedWallpaperFile!.extension ?? 'jpg';
         final path = 'wallpapers/$ts.$ext';
-        await _supabase.storage.from('wallpapers').upload(
+
+        // Real Supabase Storage Binary Upload (Wallpaper)
+        await _supabase.storage.from('wallpapers').uploadBinary(
           path,
-          _pickedWallpaperFile!,
-          fileOptions: const FileOptions(upsert: true),
+          imageBytes,
+          fileOptions: FileOptions(upsert: true, contentType: _getContentType(ext)),
         );
         url = _supabase.storage.from('wallpapers').getPublicUrl(path);
       } else {
@@ -718,15 +762,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       _wallpaperUrlController.clear();
       setState(() => _pickedWallpaperFile = null);
       await _fetchWallpapers();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر الخلفية وحفظها في قاعدة البيانات!')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر وحفظ الخلفية بنجاح في قاعدة بيانات Supabase!')));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع السحابي: $e')));
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
   }
 
-  // --- 3. Icon Pack Upload (Dual Options: Device File / Direct URL) ---
+  // --- 3. Icon Pack Upload (Dual Options: Real Binary Upload / Direct URL) ---
   Future<void> _uploadIconPack() async {
     if (!_iconFormKey.currentState!.validate()) return;
 
@@ -747,22 +791,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       String packUrl;
 
       if (_iconUploadOption == 'file' && _pickedIconPreview != null && _pickedIconFile != null) {
-        final prevExt = _pickedIconPreview!.path.split('.').last;
-        final packExt = _pickedIconFile!.path.split('.').last;
+        final prevBytes = await _getFileBytes(_pickedIconPreview!);
+        final packBytes = await _getFileBytes(_pickedIconFile!);
+        final prevExt = _pickedIconPreview!.extension ?? 'png';
+        final packExt = _pickedIconFile!.extension ?? 'zip';
 
         final prevPath = 'icons/prev_$ts.$prevExt';
-        await _supabase.storage.from('icons').upload(
+        await _supabase.storage.from('icons').uploadBinary(
           prevPath,
-          _pickedIconPreview!,
-          fileOptions: const FileOptions(upsert: true),
+          prevBytes,
+          fileOptions: FileOptions(upsert: true, contentType: _getContentType(prevExt)),
         );
         prevUrl = _supabase.storage.from('icons').getPublicUrl(prevPath);
 
         final packPath = 'icons/pack_$ts.$packExt';
-        await _supabase.storage.from('icons').upload(
+        await _supabase.storage.from('icons').uploadBinary(
           packPath,
-          _pickedIconFile!,
-          fileOptions: const FileOptions(upsert: true),
+          packBytes,
+          fileOptions: const FileOptions(upsert: true, contentType: 'application/zip'),
         );
         packUrl = _supabase.storage.from('icons').getPublicUrl(packPath);
       } else {
@@ -1000,13 +1046,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
                       onPressed: () async {
-                        final res = await FilePicker.platform.pickFiles(type: FileType.image);
-                        if (res != null && res.files.single.path != null) {
-                          setState(() => _pickedThemeImage = File(res.files.single.path!));
+                        final res = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+                          withData: true,
+                        );
+                        if (res != null && res.files.isNotEmpty) {
+                          setState(() => _pickedThemeImage = res.files.single);
                         }
                       },
                       icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
-                      label: Text(_pickedThemeImage != null ? 'تم اختيار الصورة: ${_pickedThemeImage!.path.split("/").last}' : 'اختيار صورة المعاينة من الجهاز', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      label: Text(
+                        _pickedThemeImage != null ? 'تم اختيار الصورة: ${_pickedThemeImage!.name}' : 'اختيار صورة المعاينة (JPG, PNG, WebP) من الجهاز',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     )
                   else
                     TextFormField(
@@ -1040,13 +1095,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
                       onPressed: () async {
-                        final res = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['hwt', 'hnt', 'zip']);
-                        if (res != null && res.files.single.path != null) {
-                          setState(() => _pickedThemeFile = File(res.files.single.path!));
+                        final res = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['hwt', 'hnt', 'zip'],
+                          withData: true,
+                        );
+                        if (res != null && res.files.isNotEmpty) {
+                          final file = res.files.single;
+                          setState(() {
+                            _pickedThemeFile = file;
+                            if (file.name.toLowerCase().endsWith('.hnt')) {
+                              _selectedFormat = 'hnt';
+                            } else if (file.name.toLowerCase().endsWith('.hwt')) {
+                              _selectedFormat = 'hwt';
+                            }
+                          });
                         }
                       },
                       icon: const Icon(Icons.archive, color: Color(0xFF8C52FF)),
-                      label: Text(_pickedThemeFile != null ? 'تم اختيار الملف: ${_pickedThemeFile!.path.split("/").last}' : 'اختيار ملف الثيم (.hwt/.hnt) من الجهاز', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      label: Text(
+                        _pickedThemeFile != null
+                            ? 'تم اختيار الملف: ${_pickedThemeFile!.name} (${(_pickedThemeFile!.size / (1024 * 1024)).toStringAsFixed(1)} MB)'
+                            : 'اختيار ملف الثيم (.hwt/.hnt) من الجهاز',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     )
                   else
                     TextFormField(
@@ -1162,13 +1236,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
                       onPressed: () async {
-                        final res = await FilePicker.platform.pickFiles(type: FileType.image);
-                        if (res != null && res.files.single.path != null) {
-                          setState(() => _pickedWallpaperFile = File(res.files.single.path!));
+                        final res = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+                          withData: true,
+                        );
+                        if (res != null && res.files.isNotEmpty) {
+                          setState(() => _pickedWallpaperFile = res.files.single);
                         }
                       },
                       icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
-                      label: Text(_pickedWallpaperFile != null ? 'تم اختيار الخلفية: ${_pickedWallpaperFile!.path.split("/").last}' : 'اختيار صورة الخلفية من الجهاز', style: const TextStyle(color: Colors.white)),
+                      label: Text(
+                        _pickedWallpaperFile != null
+                            ? 'تم اختيار الخلفية: ${_pickedWallpaperFile!.name} (${(_pickedWallpaperFile!.size / (1024 * 1024)).toStringAsFixed(1)} MB)'
+                            : 'اختيار صورة الخلفية (JPG, PNG, WebP) من الجهاز',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     )
                   else
                     TextFormField(
@@ -1272,26 +1357,44 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () async {
-                              final res = await FilePicker.platform.pickFiles(type: FileType.image);
-                              if (res != null && res.files.single.path != null) {
-                                setState(() => _pickedIconPreview = File(res.files.single.path!));
+                              final res = await FilePicker.platform.pickFiles(
+                                type: FileType.custom,
+                                allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+                                withData: true,
+                              );
+                              if (res != null && res.files.isNotEmpty) {
+                                setState(() => _pickedIconPreview = res.files.single);
                               }
                             },
                             icon: const Icon(Icons.image, color: Color(0xFF00D2FF)),
-                            label: Text(_pickedIconPreview != null ? 'تم اختيار المعاينة' : 'صورة المعاينة', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                            label: Text(
+                              _pickedIconPreview != null ? 'تم: ${_pickedIconPreview!.name}' : 'صورة المعاينة',
+                              style: const TextStyle(color: Colors.white, fontSize: 11),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () async {
-                              final res = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip', 'hwt', 'hnt']);
-                              if (res != null && res.files.single.path != null) {
-                                setState(() => _pickedIconFile = File(res.files.single.path!));
+                              final res = await FilePicker.platform.pickFiles(
+                                type: FileType.custom,
+                                allowedExtensions: ['zip', 'hwt', 'hnt'],
+                                withData: true,
+                              );
+                              if (res != null && res.files.isNotEmpty) {
+                                setState(() => _pickedIconFile = res.files.single);
                               }
                             },
                             icon: const Icon(Icons.archive, color: Color(0xFF8C52FF)),
-                            label: Text(_pickedIconFile != null ? 'تم اختيار الحزمة' : 'ملف الحزمة (ZIP)', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                            label: Text(
+                              _pickedIconFile != null ? 'تم: ${_pickedIconFile!.name}' : 'حزمة الأيقونات (ZIP)',
+                              style: const TextStyle(color: Colors.white, fontSize: 11),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ],
